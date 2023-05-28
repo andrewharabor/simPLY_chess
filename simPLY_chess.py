@@ -194,9 +194,9 @@ def generate_moves(position: str, castling: list[bool], en_passant: int) -> list
                     move_list.append((start_square, end_square, piece_captured, ""))
                     if piece_moved in "PNK" or piece_captured.islower():  # non-sliding piece or capture
                         break
-                    if start_square == A1 and position[end_square + EAST] == "K" and castling[0]:  # the piece is a rook on a1, and the king on e1 with empty squares in between, and queenside castling is allowed
+                    if start_square == A1 and position[end_square + EAST] == "K" and castling[0]:  # the piece is a rook on a1, and the king is on e1 with empty squares in between, and queenside castling is allowed
                         move_list.append((end_square + EAST, end_square + WEST, piece_captured, ""))
-                    if  start_square == H1 and position[end_square + WEST] == "K" and castling[1]:  # the piece is a rook on h1, and the king on e1 with empty squares in between, and kingside castling is allowed
+                    if  start_square == H1 and position[end_square + WEST] == "K" and castling[1]:  # the piece is a rook on h1, and the king is on e1 with empty squares in between, and kingside castling is allowed
                         move_list.append((end_square + WEST, end_square + EAST, piece_captured, ""))
 
     return move_list
@@ -258,9 +258,8 @@ def rotate_position(position: str, castling: list[bool], opponent_castling: list
 
 def find_check(position: str, king_passant: int) -> bool:
     """Finds if the opponent's king is in check or if they were in check before castling. Typically called after
-    make_move() and rotate_position() to see if the move was legal. Note that after rotating the board, our king
-    becomes the opponent's king ("k") in that position."""
-    king_position: int = position.find("k") if "k" in position else 0
+    make_move() and rotate_position() to see if the move was legal."""
+    king_position: int = position.find("k") if "k" in position else 0  # after rotating the board, our king "becomes the opponent's king" ("k") in that position
     if king_position == 0:
         return True
 
@@ -287,7 +286,8 @@ def find_check(position: str, king_passant: int) -> bool:
 
 
 def evaluate_position(position: str):
-    """Evaluates the given position for the side-to-move and returns a score."""
+    """Evaluates the given position for the side-to-move and returns a score. Only considers basic positional evaluation
+    (piece-square tables) and piece material point-values."""
     score: int = 0
     for square, piece in enumerate(position):
         if piece.isupper():  # ally piece
@@ -301,7 +301,7 @@ def evaluate_position(position: str):
 # SEARCH LOGIC #
 ################
 
-def quiescent_search(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, alpha: int, beta: int) -> int:
+def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
     """Performs a quiescent search (searches until no captures remain to avoid the horizon effect) with delta pruning
     on the given position and returns the score found after the search."""
     stand_pat: int = evaluate_position(position)
@@ -318,7 +318,7 @@ def quiescent_search(position: str, castling: list[bool], opponent_castling: lis
             if not find_check(new_position[0], new_position[4]): # if the move doesn't result in our king being in check (legal move)
                 delta: int = 200
                 if stand_pat + PIECE_VALUES[move[2].upper()] + delta > alpha:  # delta pruning
-                    score: int = -quiescent_search(*new_position, -beta, -alpha)
+                    score: int = -quiescent_search(-beta, -alpha, *new_position)
                     if score >= beta:
                         return beta
 
@@ -327,30 +327,32 @@ def quiescent_search(position: str, castling: list[bool], opponent_castling: lis
     return alpha
 
 
-def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, move_list: list[tuple[int, int, str, str]] = []) -> tuple[int, list[tuple[int, int, str, str]]]:
+def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
     """Performs a negamax search with alpha-beta pruning on the given position and returns the score of the best
-    possible move for the side-to-move. Orders the optional move_list parameter (only passed in by root call) for
-    better pruning."""
+    possible move for the side-to-move."""
+    global root_call_move_list
     if depth == 0:
-        return quiescent_search(position, castling[:], opponent_castling[:], en_passant, king_passant, alpha, beta), []
+        return quiescent_search(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
 
     killer_move: tuple[int, int, str, str] | None = TRANSPOSITION_TABLE.get(str(position))  # get move if we already searched this position
     if (depth != root_call_depth) and (killer_move is not None):  # using killer move at root depth defeats the purpose of iterative deepening
-        return evaluate_position(position), []
+        return evaluate_position(position)
 
     else:
         moves: list[tuple[int, tuple[int, int, str, str]]] = []  # list of tuples containing the score and move
-        if len(move_list) == 0:
-            move_list = generate_moves(position, castling[:], en_passant)
+        if depth == root_call_depth:
+            move_list: list[tuple[int, int, str, str]] = root_call_move_list  # use the sorted move list from the root call
+        else:
+            move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
         best_move: tuple[int, int, str, str] = move_list[0]
         for move in move_list:
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
             new_position = rotate_position(*new_position)
             if not find_check(new_position[0], new_position[4]):  # if the move doesn't result in our king being in check (legal move)
-                score: int = -nega_max_search(depth - 1, -beta, -alpha, *new_position)[0]
+                score: int = -nega_max_search(depth - 1, -beta, -alpha, *new_position)
                 moves.append((score, move))
                 if score >= beta:
-                    return beta, []
+                    return beta  # fail-hard beta cutoff
 
                 if score > alpha:
                     alpha = score
@@ -358,34 +360,47 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
         if len(moves) == 0:  # if there are no legal moves, it's either checkmate or stalemate.
             new_position = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
             if find_check(new_position[0], 0):
-                return -CHECKMATE_LOWER - depth, []
+                return -CHECKMATE_LOWER - depth
 
             else:
-                return 0, []
+                return 0
 
         else:
             if depth == root_call_depth:  # only sort moves at the root
                 moves.sort(key=lambda m: m[0], reverse=True)
-                move_list = [pair[1] for pair in moves]
-            if depth > 2:  # if depth is higher, this could be increased for a more accurate transposition table
+                root_call_move_list = [pair[1] for pair in moves]
+            if depth > 1:  # if depth is higher, this could be increased for a more accurate transposition table
                 TRANSPOSITION_TABLE[str(position)] = best_move
-            return alpha, move_list
+            return alpha
 
+
+root_call_move_list: list[tuple[int, int, str, str]]
+root_call_depth: int
 
 def search_position(depth: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, int, str, str]:
     """Searches the given position and returns the best move found. Acts as root call for negamax search with
-    alpha-beta pruning, iterative deepening and quiescent search with delta pruning."""
-    # We pass the optional move_list parameter so that we can order and return that list.
-    # By reassigning the return value of nega_max_search() to possible_moves, we can use the previous iteration's move list to speed up the search.
-    possible_moves: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
-    global root_call_depth
-    for root_call_depth in range(1, depth):
-        possible_moves = nega_max_search(root_call_depth, -CHECKMATE_UPPER, CHECKMATE_UPPER, position, castling, opponent_castling, en_passant, king_passant, possible_moves)[1]
-    if len(possible_moves) > 0:
-        return possible_moves[0]
-
-    else:
+    alpha-beta pruning with quiescent search with delta pruning within an iterative deepening framework that utilizes
+    aspiration windows."""
+    global root_call_move_list, root_call_depth
+    root_call_move_list = generate_moves(position, castling[:], en_passant)
+    if len(root_call_move_list) == 0:  # position is either checkmate or stalemate, no moves to search
         return (0, 0, "", "")
+
+    root_call_depth = 1
+    root_call_alpha: int = -CHECKMATE_UPPER  # for our aspiration windows so that we look for a score within a certain range
+    root_call_beta: int = CHECKMATE_UPPER  # set initial bounds for search which we update after each iteration
+    root_call_score: int = 0
+    while root_call_depth <= depth:
+        root_call_score = nega_max_search(root_call_depth, root_call_alpha, root_call_beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        if root_call_score >= root_call_beta:  # search resulted in fail-hard beta cutoff so we need to re-search
+            root_call_alpha = -CHECKMATE_UPPER  # reset bounds for re-search
+            root_call_beta = CHECKMATE_UPPER
+        else:
+            root_call_alpha = root_call_score - (PIECE_VALUES["P"] // 4)  # set new bounds for search
+            root_call_beta = root_call_score + (PIECE_VALUES["P"] // 4)
+            root_call_depth += 1  # only increase depth if we don't need to re-search
+    return root_call_move_list[0]  # ordered in descending order so the first move is the best
+
 
 
 ################
@@ -504,7 +519,9 @@ def main() -> None:
                         color = "w"
             king_passant = 0
         elif tokens[0] == "go":
-            best_move: tuple[int, int, str, str] = search_position(4, position, castling, opponent_castling, en_passant, king_passant)
+            # Even with iterative deepening and the likes, the engine is still too slow to search more than 3 ply (likely because of quiescence search).
+            # Without quiescence search, the engine is able to search 4 ply in a reasonable amount of time but move quality is sacrificed.
+            best_move: tuple[int, int, str, str] = search_position(3, position, castling, opponent_castling, en_passant, king_passant)
             start_square: int = best_move[0]
             end_square: int = best_move[1]
             promotion_piece: str = best_move[3]
