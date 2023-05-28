@@ -38,6 +38,6 @@ A simple and minimalist chess engine written in Python. This project was heavily
 
 - Does not have an [opening book](https://www.chessprogramming.org/Opening_Book) meaning that it has almost no variation in the [opening](https://www.chessprogramming.org/Opening) stage of the game
 
-## My Goal
+## My Thoughts
 
-I made this engine because I enjoy playing chess and I realized that it actually wasn't too difficult to write a program to do so. My goal with this project was for the engine to beat me but despite not having accomplished that, I still learned a lot along the way.
+I decided to program this engine because I enjoy playing chess and I figured it would be a challenging project. While I had initially hoped for it to be able to beat me, it still plays chess fairly well. There are many ways I could improve the playing strength of the engine (both through new features and optimizations), but for now, I'll just leave it as is. Overall, I learned a lot about search algorithms and I really enjoyed working through this project.
