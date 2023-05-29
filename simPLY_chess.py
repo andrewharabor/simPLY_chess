@@ -72,7 +72,7 @@ TRANSPOSITION_TABLE: dict[str, tuple[int, int, str, str]] = {}
 PIECE_SQUARE_TABLES: dict[str, list[int]] = {
     'P': [  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
             0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-            0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
+            0, 929, 929, 929, 929, 929, 929, 929, 929,   0,  # while pawns can't reach the last rank, the engine disregards promotion if this row is set to zeros
             0,  78,  83,  86,  73, 102,  82,  85,  90,   0,
             0,   7,  29,  21,  44,  40,  31,  44,   7,   0,
             0, -17,  16,  -2,  15,  14,   0,  15, -13,   0,
@@ -151,6 +151,7 @@ PIECE_SQUARE_TABLES: dict[str, list[int]] = {
 
 # Piece values, used for material evaluation
 PIECE_VALUES: dict[str, int] = {
+    "": 0,
     "P": 100,
     "N": 280,
     "B": 320,
@@ -188,7 +189,7 @@ def generate_moves(position: str, castling: list[bool], en_passant: int) -> list
                         if direction in [NORTH + WEST, NORTH + EAST] and piece_captured == "." and end_square + SOUTH != en_passant:  # invalid en passant capture
                             break
                         if A8 <= end_square <= H8:  # pawn promotion
-                            for promotion_piece in "NBRQ":
+                            for promotion_piece in "QRBN":
                                 move_list.append((start_square, end_square, piece_captured, promotion_piece))
                             break
                     move_list.append((start_square, end_square, piece_captured, ""))
@@ -285,7 +286,11 @@ def find_check(position: str, king_passant: int) -> bool:
     return False
 
 
-def evaluate_position(position: str):
+########################
+# EVALUATION FUNCTIONS #
+########################
+
+def evaluate_position(position: str) -> int:
     """Evaluates the given position for the side-to-move and returns a score. Only considers basic positional evaluation
     (piece-square tables) and piece material point-values."""
     score: int = 0
@@ -296,29 +301,54 @@ def evaluate_position(position: str):
             score -= PIECE_VALUES[piece.upper()] + PIECE_SQUARE_TABLES[piece.upper()][119 - square]
     return score
 
+def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
+    """Evaluates the given move for the side-to-move and returns a score."""
+    start_square: int = move[0]
+    end_square: int = move[1]
+    piece_moved: str = position[start_square]
+    piece_captured: str = move[2]
+    promotion_piece: str = move[3]
+    score: int = PIECE_SQUARE_TABLES[piece_moved][end_square] - PIECE_SQUARE_TABLES[piece_moved][start_square]
+    if piece_captured.islower():  # capture
+        score += PIECE_SQUARE_TABLES[piece_captured.upper()][119 - end_square]
+    if piece_moved == "K" and abs(start_square - end_square) == 2:  # castling
+        score += PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
+    if piece_moved == "P":
+        if A8 <= end_square <= H8:  # pawn promotion
+            score += PIECE_SQUARE_TABLES[promotion_piece][end_square] - PIECE_SQUARE_TABLES["P"][end_square]
+            score += PIECE_VALUES[promotion_piece] - PIECE_VALUES["P"]
+        if end_square + SOUTH == en_passant:
+            score += PIECE_SQUARE_TABLES["P"][119 - (end_square + SOUTH)]
+    return score
+
 
 ################
 # SEARCH LOGIC #
 ################
 
-def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
-    """Performs a quiescent search (searches until no captures remain to avoid the horizon effect) with delta pruning
-    on the given position and returns the score found after the search."""
+
+def quiescent_search(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
+    """Performs a quiescent search (searches captures only until a quiet position or max depth is reached) with delta
+    pruning on the given position and returns the score found after the search."""
     stand_pat: int = evaluate_position(position)
+    if depth == 0:  # while using quiescent search with depth reduces its effectiveness, the search takes too long otherwise
+        return stand_pat
+
     if stand_pat >= beta:
         return beta
 
     if alpha < stand_pat:
         alpha = stand_pat
     move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
+    move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
     for move in move_list:
         if move[2].islower():  # capture
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
             new_position = rotate_position(*new_position)
             if not find_check(new_position[0], new_position[4]): # if the move doesn't result in our king being in check (legal move)
                 delta: int = 200
-                if stand_pat + PIECE_VALUES[move[2].upper()] + delta > alpha:  # delta pruning
-                    score: int = -quiescent_search(-beta, -alpha, *new_position)
+                if stand_pat + PIECE_VALUES[move[2].upper()] + PIECE_VALUES[move[3]] + delta > alpha:  # delta pruning
+                    score: int = -quiescent_search(depth - 1, -beta, -alpha, *new_position)
                     if score >= beta:
                         return beta
 
@@ -330,9 +360,9 @@ def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool],
 def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
     """Performs a negamax search with alpha-beta pruning on the given position and returns the score of the best
     possible move for the side-to-move."""
-    global root_call_move_list
+    global root_call_move_list, root_call_depth
     if depth == 0:
-        return quiescent_search(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        return quiescent_search(root_call_depth * 4, alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
 
     killer_move: tuple[int, int, str, str] | None = TRANSPOSITION_TABLE.get(str(position))  # get move if we already searched this position
     if (depth != root_call_depth) and (killer_move is not None):  # using killer move at root depth defeats the purpose of iterative deepening
@@ -344,6 +374,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
             move_list: list[tuple[int, int, str, str]] = root_call_move_list  # use the sorted move list from the root call
         else:
             move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
+            move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
         best_move: tuple[int, int, str, str] = move_list[0]
         for move in move_list:
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
@@ -358,6 +389,8 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
                     alpha = score
                     best_move = move
         if len(moves) == 0:  # if there are no legal moves, it's either checkmate or stalemate.
+            if depth == root_call_depth:
+                root_call_move_list = []
             new_position = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
             if find_check(new_position[0], 0):
                 return -CHECKMATE_LOWER - depth
@@ -367,7 +400,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
 
         else:
             if depth == root_call_depth:  # only sort moves at the root
-                moves.sort(key=lambda m: m[0], reverse=True)
+                moves.sort(key=lambda pair: pair[0], reverse=True)
                 root_call_move_list = [pair[1] for pair in moves]
             if depth > 1:  # if depth is higher, this could be increased for a more accurate transposition table
                 TRANSPOSITION_TABLE[str(position)] = best_move
@@ -383,24 +416,23 @@ def search_position(depth: int, position: str, castling: list[bool], opponent_ca
     aspiration windows."""
     global root_call_move_list, root_call_depth
     root_call_move_list = generate_moves(position, castling[:], en_passant)
-    if len(root_call_move_list) == 0:  # position is either checkmate or stalemate, no moves to search
-        return (0, 0, "", "")
-
+    root_call_move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
     root_call_depth = 1
     root_call_alpha: int = -CHECKMATE_UPPER  # for our aspiration windows so that we look for a score within a certain range
     root_call_beta: int = CHECKMATE_UPPER  # set initial bounds for search which we update after each iteration
     root_call_score: int = 0
     while root_call_depth <= depth:
         root_call_score = nega_max_search(root_call_depth, root_call_alpha, root_call_beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        if len(root_call_move_list) == 0:  # current position is checkmate or stalemate, return empty move
+            return (0, 0, "", "")
         if root_call_score >= root_call_beta:  # search resulted in fail-hard beta cutoff so we need to re-search
             root_call_alpha = -CHECKMATE_UPPER  # reset bounds for re-search
             root_call_beta = CHECKMATE_UPPER
         else:
-            root_call_alpha = root_call_score - (PIECE_VALUES["P"] // 4)  # set new bounds for search
-            root_call_beta = root_call_score + (PIECE_VALUES["P"] // 4)
+            root_call_alpha = root_call_score - (PIECE_VALUES["P"] // 2)  # set new bounds for search
+            root_call_beta = root_call_score + (PIECE_VALUES["P"] // 2)
             root_call_depth += 1  # only increase depth if we don't need to re-search
     return root_call_move_list[0]  # ordered in descending order so the first move is the best
-
 
 
 ################
@@ -458,15 +490,7 @@ def send_response(response: str) -> None:
 
 def main() -> None:
     """The main UCI protocol loop responsible for parsing commands and sending responses. Sets up the board and
-    calls the search function when instructed.
-
-    Accepted commands:\n
-    uci - Initiates UCI protocol\n
-    isready - Synchronizes and initializes engine\n
-    ucinewgame - Notifies engine that next search will be from a different game (resets transposition table as well)\n
-    position [fen <fenstring> | startpos ]  moves <move1> ... <movei> - Sets up the board position according to the FEN string or in the start position\n
-    go - Calculate the best move for the current position\n
-    """
+    calls the search function when instructed."""
     global position, castling, opponent_castling, en_passant, king_passant, color
     while True:
         command: str = sys.stdin.readline().strip()
