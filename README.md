@@ -9,6 +9,7 @@ A simple and minimalist chess engine written in Python. This project was heavily
  I initially planned to use the official [API](https://github.com/lichess-bot-devs/lichess-bot) to put the engine on [Lichess](https://lichess.org/) but until then, just import the engine in a [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) [GUI](https://www.chessprogramming.org/GUI) if you want to play against it.
 
  ![ ](game.gif)
+
  _A game that I (with the black pieces) played against simPLY_chess and won_
 
 ## Features
