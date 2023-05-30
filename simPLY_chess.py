@@ -717,7 +717,7 @@ def main() -> None:
                 start_square = 119 - start_square
                 end_square = 119 - end_square
             if best_move == (0, 0, "", ""):
-                move_string: str = "0000"
+                move_string: str = "(none)"
             else:
                 move_string: str = render_coordinates(start_square) + render_coordinates(end_square) + promotion_piece.lower()
             send_response(f"bestmove {move_string}")
