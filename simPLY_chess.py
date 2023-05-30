@@ -541,7 +541,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
         else:
             move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
             move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
-        best_move: tuple[int, int, str, str] = move_list[0]
+        best_move: tuple[int, int, str, str] = (0, 0, "", "")
         for move in move_list:
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
             new_position = rotate_position(*new_position)
@@ -568,7 +568,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
             if depth == root_call_depth:  # only sort moves at the root
                 moves.sort(key=lambda pair: pair[0], reverse=True)
                 root_call_move_list = [pair[1] for pair in moves]
-            if depth > 1 and not king_in_check(position, king_passant):  # if depth is higher, this could be increased for a more accurate transposition table
+            if depth > 1 and best_move != (0, 0, "", ""):  # if depth is higher, this could be increased for a more accurate transposition table
                 TRANSPOSITION_TABLE[str(position)] = best_move
             return alpha
 
