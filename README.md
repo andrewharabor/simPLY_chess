@@ -26,7 +26,9 @@ A simple and minimalist chess engine written in Python. This project was heavily
 
 - [Iterative deepening](https://www.chessprogramming.org/Iterative_Deepening) framework to counter-intuitively speed up search times through simplified [PV move ordering](https://www.chessprogramming.org/Move_Ordering) from the last fully-completed search
 
-- Utilizes [aspiration windows](https://www.chessprogramming.org/Aspiration_Windows) in order to improve the effectiveness of alpha-beta pruning by tightening the bounds of the search window
+- Utilizes [aspiration windows](https://www.chessprogramming.org/Aspiration_Windows) in order to improve the effectiveness of [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) by tightening the bounds of the search window
+
+- [Tapered evaluation](https://www.chessprogramming.org/Tapered_Eval) to interpolate between the evaluation of the position using middlegame and endgame criteria
 
 - Communicates through standard [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) protocol to allow for easy integration into any [GUI](https://www.chessprogramming.org/GUI)
   - Accepted commands:
@@ -43,8 +45,6 @@ A simple and minimalist chess engine written in Python. This project was heavily
 - Written in Python meaning that it isn't too strong since it can't search past a depth of 4 ply in a reasonable amount of time (even 4 is on the slow side so 3 is recommended)
 
 - Does not take [3-fold repetition](https://www.chessprogramming.org/Repetitions#Fide_Rule) or the [fifty-move-rule](https://www.chessprogramming.org/Fifty-move_Rule#Fide_Rule) into account meaning that those rules can be exploited when the engine has a winning position
-
-- Does not have any [endgame](https://www.chessprogramming.org/Endgame) knowledge nor [endgame-specific evaluation](https://www.chessprogramming.org/Endgame#Evaluation) meaning that it completely misjudges this phase of the game
 
 - Does not have an [opening book](https://www.chessprogramming.org/Opening_Book) meaning that it has almost no variation in the [opening](https://www.chessprogramming.org/Opening) stage of the game
 

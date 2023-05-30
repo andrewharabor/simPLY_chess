@@ -67,102 +67,223 @@ color: str = INITIAL_COLOR
 # Transposition table, used to store previously calculated positions and keep track of the best move
 TRANSPOSITION_TABLE: dict[str, tuple[int, int, str, str]] = {}
 
-# Piece square tables, used to evaluate the position through the positioning of the pieces
-# For black, the tables are rotated
-PIECE_SQUARE_TABLES: dict[str, list[int]] = {
-    'P': [  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-            0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-            0, 929, 929, 929, 929, 929, 929, 929, 929,   0,  # while pawns can't reach the last rank, the engine disregards promotion if this row is set to zeros
-            0,  78,  83,  86,  73, 102,  82,  85,  90,   0,
-            0,   7,  29,  21,  44,  40,  31,  44,   7,   0,
-            0, -17,  16,  -2,  15,  14,   0,  15, -13,   0,
-            0, -26,   3,  10,   9,   6,   1,   0, -23,   0,
-            0, -22,   9,   5, -11, -10,  -2,   3, -19,   0,
-            0, -31,   8,  -7, -37, -36, -14,   3, -31,   0,
-            0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-            0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-            0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
+# Piece values and piece square tables for the middlegame and endgame
+# Used to evaluate the position in terms of material and piece placement
+MIDGAME_PAWN_VALUE: int = 100
+MIDGAME_KNIGHT_VALUE: int = 411
+MIDGAME_BISHOP_VALUE: int = 445
+MIDGAME_ROOK_VALUE: int = 582
+MIDGAME_QUEEN_VALUE: int = 1250
+MIDGAME_KING_VALUE: int = 60000
 
-    'N': [  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-            0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-            0, -66, -53, -75, -75, -10, -55, -58, -70,   0,
-            0,  -3,  -6, 100, -36,   4,  62,  -4, -14,   0,
-            0,  10,  67,   1,  74,  73,  27,  62,  -2,   0,
-            0,  24,  24,  45,  37,  33,  41,  25,  17,   0,
-            0,  -1,   5,  31,  21,  22,  35,   2,   0,   0,
-            0, -18,  10,  13,  22,  18,  15,  11, -14,   0,
-            0, -23, -15,   2,   0,   2,   0, -23, -20,   0,
-            0, -74, -23, -26, -24, -19, -35, -22, -69,   0,
-            0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
-            0,   0,   0,   0,   0,   0,   0,   0,   0,   0],
-
-    'B': [  0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,  -59, -78, -82, -76, -23,-107, -37, -50,  0,
-            0,  -11,  20,  35, -42, -39,  31,   2, -22,  0,
-            0,   -9,  39, -32,  41,  52, -10,  28, -14,  0,
-            0,   25,  17,  20,  34,  26,  25,  15,  10,  0,
-            0,   13,  10,  17,  23,  17,  16,   0,   7,  0,
-            0,   14,  25,  24,  15,   8,  25,  20,  15,  0,
-            0,   19,  20,  11,   6,   7,   6,  20,  16,  0,
-            0,   -7,   2, -15, -12, -14, -15, -10, -10,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0],
-
-    'R': [  0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,   35,  29,  33,   4,  37,  33,  56,  50,  0,
-            0,   55,  29,  56,  67,  55,  62,  34,  60,  0,
-            0,   19,  35,  28,  33,  45,  27,  25,  15,  0,
-            0,    0,   5,  16,  13,  18,  -4,  -9,  -6,  0,
-            0,  -28, -35, -16, -21, -13, -29, -46, -30,  0,
-            0,  -42, -28, -42, -25, -25, -35, -26, -46,  0,
-            0,  -53, -38, -31, -26, -29, -43, -44, -53,  0,
-            0,  -30, -24, -18,   5,  -2, -18, -31, -32,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0],
-
-    'Q': [  0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    6,   1,  -8,-104,  69,  24,  88,  26,  0,
-            0,   14,  32,  60, -10,  20,  76,  57,  24,  0,
-            0,   -2,  43,  32,  60,  72,  63,  43,   2,  0,
-            0,    1, -16,  22,  17,  25,  20, -13,  -6,  0,
-            0,  -14, -15,  -2,  -5,  -1, -10, -20, -22,  0,
-            0,  -30,  -6, -13, -11, -16, -11, -16, -27,  0,
-            0,  -36, -18,   0, -19, -15, -15, -21, -38,  0,
-            0,  -39, -30, -31, -13, -31, -36, -34, -42,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0],
-
-    'K': [  0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    4,  54,  47, -99, -99,  60,  83, -62,  0,
-            0,  -32,  10,  55,  56,  56,  55,  10,   3,  0,
-            0,  -62,  12, -57,  44, -67,  28,  37, -31,  0,
-            0,  -55,  50,  11,  -4, -19,  13,   0, -49,  0,
-            0,  -55, -43, -52, -28, -51, -47,  -8, -50,  0,
-            0,  -47, -42, -43, -79, -64, -32, -29, -32,  0,
-            0,   -4,   3, -14, -50, -57, -18,  13,   4,  0,
-            0,   17,  30,  -3, -14,   6,  -1,  40,  18,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0,
-            0,    0,   0,   0,   0,   0,   0,   0,   0,  0]
-}
-
-# Piece values, used for material evaluation
-PIECE_VALUES: dict[str, int] = {
+MIDGAME_PIECE_VALUES: dict[str, int] = {
     "": 0,
-    "P": 100,
-    "N": 280,
-    "B": 320,
-    "R": 479,
-    "Q": 929,
-    "K": 60000,
+    "P": MIDGAME_PAWN_VALUE,
+    "N": MIDGAME_KNIGHT_VALUE,
+    "B": MIDGAME_BISHOP_VALUE,
+    "R": MIDGAME_ROOK_VALUE,
+    "Q": MIDGAME_QUEEN_VALUE,
+    "K": MIDGAME_KING_VALUE
 }
+
+MIDGAME_PAWN_TABLE: list[int] = [
+    1250, 1250, 1250, 1250, 1250, 1250, 1250, 1250,
+     120,  163,   74,  116,   83,  154,   41,  -13,
+      -7,    9,   32,   38,   79,   68,   30,  -24,
+     -17,   16,    7,   26,   28,   15,   21,  -28,
+     -33,   -2,   -6,   20,   26,    7,   12,  -30,
+     -32,   -5,   -5,  -12,    4,    4,   40,  -15,
+     -43,   -1,  -24,  -23,  -33,   29,   46,  -27,
+       0,    0,    0,    0,    0,    0,    0,    0,
+]
+
+MIDGAME_KNIGHT_TABLE: list[int] = [
+    -204, -109,  -41,  -60,   74, -118,  -18, -130,
+     -89,  -50,   88,   44,   28,   76,    9,  -21,
+     -57,   73,   45,   79,  102,  157,   89,   54,
+     -11,   21,   23,   65,   45,   84,   22,   27,
+     -16,    5,   20,   16,   34,   23,   26,  -10,
+     -28,  -11,   15,   12,   23,   21,   30,  -20,
+     -35,  -65,  -15,   -4,   -1,   22,  -17,  -23,
+    -128,  -26,  -71,  -40,  -21,  -34,  -23,  -28,
+]
+
+MIDGAME_BISHOP_TABLE: list[int] = [
+     -35,    5, -100,  -45,  -30,  -51,    9,  -10,
+     -32,   20,  -22,  -16,   37,   72,   22,  -57,
+     -20,   45,   52,   49,   43,   61,   45,   -2,
+      -5,    6,   23,   61,   45,   45,    9,   -2,
+      -7,   16,   16,   32,   41,   15,   12,    5,
+       0,   18,   18,   18,   17,   33,   22,   12,
+       5,   18,   20,    0,    9,   26,   40,    1,
+     -40,   -4,  -17,  -26,  -16,  -15,  -48,  -26,
+]
+
+MIDGAME_ROOK_TABLE: list[int] = [
+      39,   51,   39,   62,   77,   11,   38,   52,
+      33,   39,   71,   76,   98,   82,   32,   54,
+      -6,   23,   32,   44,   21,   55,   74,   20,
+     -29,  -13,    9,   32,   29,   43,  -10,  -24,
+     -44,  -32,  -15,   -1,   11,   -9,    7,  -28,
+     -55,  -30,  -20,  -21,    4,    0,   -6,  -40,
+     -54,  -20,  -24,  -11,   -1,   13,   -7,  -87,
+     -23,  -16,    1,   21,   20,    9,  -45,  -32,
+]
+
+MIDGAME_QUEEN_TABLE: list[int] = [
+     -34,    0,   35,   15,   72,   54,   52,   55,
+     -29,  -48,   -6,    1,  -20,   70,   34,   66,
+     -16,  -21,    9,   10,   35,   68,   57,   70,
+     -33,  -33,  -20,  -20,   -1,   21,   -2,    1,
+     -11,  -32,  -11,  -12,   -2,   -5,    4,   -4,
+     -17,    2,  -13,   -2,   -6,    2,   17,    6,
+     -43,  -10,   13,    2,   10,   18,   -4,    1,
+      -1,  -22,  -11,   12,  -18,  -30,  -38,  -61,
+]
+
+MIDGAME_KING_TABLE: list[int] = [
+     -79,   28,   20,  -18,  -68,  -41,    2,   16,
+      35,   -1,  -24,   -9,  -10,   -5,  -46,  -35,
+     -11,   29,    2,  -20,  -24,    7,   27,  -27,
+     -21,  -24,  -15,  -33,  -37,  -30,  -17,  -44,
+     -60,   -1,  -33,  -48,  -56,  -54,  -40,  -62,
+     -17,  -17,  -27,  -56,  -54,  -37,  -18,  -33,
+       1,    9,  -10,  -78,  -52,  -20,   11,   10,
+     -18,   44,   15,  -66,   10,  -34,   29,   17,
+]
+
+MIDGAME_PIECE_SQUARE_TABLES: dict[str, list[int]] = {
+    "P": MIDGAME_PAWN_TABLE,
+    "N": MIDGAME_KNIGHT_TABLE,
+    "B": MIDGAME_BISHOP_TABLE,
+    "R": MIDGAME_ROOK_TABLE,
+    "Q": MIDGAME_QUEEN_TABLE,
+    "K": MIDGAME_KING_TABLE,
+}
+
+# Pad the midgame tables with zeros to make them 10x12
+for piece in "PNBRQK":
+    new_table: list[int] = []
+    blank_row: list[int] = [0] * 10
+    new_table += blank_row + blank_row
+    for row in range(0, 64, 8):
+        new_table += [0] + MIDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
+    new_table += blank_row + blank_row
+    MIDGAME_PIECE_SQUARE_TABLES[piece] = new_table
+
+ENDGAME_PAWN_VALUE: int = 115
+ENDGAME_KNIGHT_VALUE: int = 343
+ENDGAME_BISHOP_VALUE: int = 362
+ENDGAME_ROOK_VALUE: int = 624
+ENDGAME_QUEEN_VALUE: int = 1141
+ENDGMAE_KING_VALUE: int = 60000
+
+ENDGAME_PIECE_VALUES: dict[str, int] = {
+    "": 0,
+    "P": ENDGAME_PAWN_VALUE,
+    "N": ENDGAME_KNIGHT_VALUE,
+    "B": ENDGAME_BISHOP_VALUE,
+    "R": ENDGAME_ROOK_VALUE,
+    "Q": ENDGAME_QUEEN_VALUE,
+    "K": ENDGMAE_KING_VALUE,
+}
+
+ENDGAME_PAWN_TABLE: list[int] = [
+    1141, 1141, 1141, 1141, 1141, 1141, 1141, 1141,
+     217,  211,  193,  163,  179,  161,  201,  228,
+     115,  122,  104,   82,   68,   65,  100,  102,
+      39,   29,   16,    6,   -2,    5,   21,   21,
+      16,   11,   -4,   -9,   -9,  -10,    4,   -1,
+       5,    9,   -7,    1,    0,   -6,   -1,  -10,
+      16,   10,   10,   12,   16,    0,    2,   -9,
+       0,    0,    0,    0,    0,    0,    0,    0,
+]
+
+ENDGAME_KNIGHT_TABLE: list[int] = [
+     -71,  -46,  -16,  -34,  -38,  -33,  -77, -121,
+     -30,  -10,  -30,   -2,  -11,  -30,  -29,  -63,
+     -29,  -24,   12,   11,   -1,  -11,  -23,  -50,
+     -21,    4,   27,   27,   27,   13,   10,  -22,
+     -22,   -7,   20,   30,   20,   21,    5,  -22,
+     -28,   -4,   -1,   18,   12,   -4,  -24,  -27,
+     -51,  -24,  -12,   -6,   -2,  -24,  -28,  -54,
+     -35,  -62,  -28,  -18,  -27,  -22,  -61,  -78,
+]
+
+ENDGAME_BISHOP_TABLE: list[int] = [
+     -17,  -26,  -13,  -10,   -9,  -11,  -21,  -29,
+     -10,   -5,    9,  -15,   -4,  -16,   -5,  -17,
+       2,  -10,    0,   -1,   -2,    7,    0,    5,
+      -4,   11,   15,   11,   17,   12,    4,    2,
+      -7,    4,   16,   23,    9,   12,   -4,  -11,
+     -15,   -4,   10,   12,   16,    4,   -9,  -18,
+     -17,  -22,   -9,   -1,    5,  -11,  -18,  -33,
+     -28,  -11,  -28,   -6,  -11,  -20,   -6,  -21,
+]
+
+ENDGAME_ROOK_TABLE: list[int] = [
+      16,   12,   22,   18,   15,   15,   10,    6,
+      13,   16,   16,   13,   -4,    4,   10,    4,
+       9,    9,    9,    6,    5,   -4,   -6,   -4,
+       5,    4,   16,    1,    2,    1,   -1,    2,
+       4,    6,   10,    5,   -6,   -7,  -10,  -13,
+      -5,    0,   -6,   -1,   -9,  -15,  -10,  -20,
+      -7,   -7,    0,    2,  -11,  -11,  -13,   -4,
+     -11,    2,    4,   -1,   -6,  -16,    5,  -24,
+]
+
+ENDGAME_QUEEN_TABLE: list[int] = [
+     -11,   27,   27,   33,   33,   23,   12,   24,
+     -21,   24,   39,   50,   71,   30,   37,    0,
+     -24,    7,   11,   60,   57,   43,   23,   11,
+       4,   27,   29,   55,   70,   49,   70,   44,
+     -22,   34,   23,   57,   38,   41,   48,   28,
+     -20,  -33,   18,    7,   11,   21,   12,    6,
+     -27,  -28,  -37,  -20,  -20,  -28,  -44,  -39,
+     -40,  -34,  -27,  -52,   -6,  -39,  -24,  -50,
+]
+
+ENDGAME_KING_TABLE: list[int] = [
+     -90,  -43,  -22,  -22,  -13,   18,    5,  -21,
+     -15,   21,   17,   21,   21,   46,   28,   13,
+      12,   21,   28,   18,   24,   55,   54,   16,
+     -10,   27,   29,   33,   32,   40,   32,    4,
+     -22,   -5,   26,   29,   33,   28,   11,  -13,
+     -23,   -4,   13,   26,   28,   20,    9,  -11,
+     -33,  -13,    5,   16,   17,    5,   -6,  -21,
+     -65,  -41,  -26,  -13,  -34,  -17,  -29,  -52,
+]
+
+ENDGAME_PIECE_SQUARE_TABLES: dict[str, list[int]] = {
+    "P": ENDGAME_PAWN_TABLE,
+    "N": ENDGAME_KNIGHT_TABLE,
+    "B": ENDGAME_BISHOP_TABLE,
+    "R": ENDGAME_ROOK_TABLE,
+    "Q": ENDGAME_QUEEN_TABLE,
+    "K": ENDGAME_KING_TABLE,
+}
+
+# Pad the endgame tables with zeros to make them 10x12
+for piece in "PNBRQK":
+    blank_row: list[int] = [0] * 10
+    new_table: list[int] = []
+    new_table += blank_row + blank_row
+    for row in range(0, 64, 8):
+        new_table += [0] + ENDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
+    new_table += blank_row + blank_row
+    ENDGAME_PIECE_SQUARE_TABLES[piece] = new_table
 
 # Checkmate scores
-CHECKMATE_UPPER = PIECE_VALUES["K"] + 10 * PIECE_VALUES["Q"]
-CHECKMATE_LOWER = PIECE_VALUES["K"] - 10 * PIECE_VALUES["Q"]
+CHECKMATE_UPPER: int = MIDGAME_KING_VALUE + 10 * MIDGAME_QUEEN_VALUE
+CHECKMATE_LOWER: int = MIDGAME_KING_VALUE - 10 * MIDGAME_QUEEN_VALUE
+
+# Game phase constants (used to interpolate between midgame and endgame evaluations)
+PAWN_PHASE: int = 0
+KNIGHT_PHASE: int = 1
+BISHOP_PHASE: int = 1
+ROOK_PHASE: int = 2
+QUEEN_PHASE: int = 4
+TOTAL_PHASE: int = 16 * PAWN_PHASE + 4 * KNIGHT_PHASE + 4 * BISHOP_PHASE + 4 * ROOK_PHASE + 2 * QUEEN_PHASE
 
 
 ###############
@@ -290,35 +411,80 @@ def find_check(position: str, king_passant: int) -> bool:
 # EVALUATION FUNCTIONS #
 ########################
 
-def evaluate_position(position: str) -> int:
-    """Evaluates the given position for the side-to-move and returns a score. Only considers basic positional evaluation
-    (piece-square tables) and piece material point-values."""
+def game_phase(position: str) -> int:
+    """Evaluates the current game phase though piece counts."""
+    phase: int = TOTAL_PHASE
+    phase -= (position.count("P") + position.count("p")) * PAWN_PHASE
+    phase -= (position.count("N") + position.count("n")) * KNIGHT_PHASE
+    phase -= (position.count("B") + position.count("b")) * BISHOP_PHASE
+    phase -= (position.count("R") + position.count("r")) * ROOK_PHASE
+    phase -= (position.count("Q") + position.count("q")) * QUEEN_PHASE
+    return (phase * 256 + (TOTAL_PHASE // 2)) // TOTAL_PHASE
+
+
+def interpolate_evaluations(midgame_score: int, endgame_score: int, phase: int) -> int:
+    """Uses the game phase to interpolate between the midgame and endgame scores."""
+    return ((midgame_score * (256 - phase)) + (endgame_score * phase)) // 256
+
+
+def evaluate_position_midgame(position: str) -> int:
+    """Evaluates the given position for the side-to-move using the midgame piece values and piece-square tables."""
     score: int = 0
     for square, piece in enumerate(position):
         if piece.isupper():  # ally piece
-            score += PIECE_VALUES[piece] + PIECE_SQUARE_TABLES[piece][square]
+            score += MIDGAME_PIECE_VALUES[piece] + MIDGAME_PIECE_SQUARE_TABLES[piece][square]
         elif piece.islower():  # opponent piece
-            score -= PIECE_VALUES[piece.upper()] + PIECE_SQUARE_TABLES[piece.upper()][119 - square]
+            score -= MIDGAME_PIECE_VALUES[piece.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece.upper()][119 - square]
     return score
+
+
+def evaluate_position_endgame(position: str) -> int:
+    """Evaluates the given position for the side-to-move using the endgame piece values and piece-square tables."""
+    score: int = 0
+    for square, piece in enumerate(position):
+        if piece.isupper():  # ally piece
+            score += ENDGAME_PIECE_VALUES[piece] + ENDGAME_PIECE_SQUARE_TABLES[piece][square]
+        elif piece.islower():  # opponent piece
+            score -= ENDGAME_PIECE_VALUES[piece.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece.upper()][119 - square]
+    return score
+
+
+def evaluate_position(position: str) -> int:
+    """Evaluates the given position for the side-to-move by interpolating between the midgame and endgame evaluations."""
+    midgame_score: int = evaluate_position_midgame(position)
+    endgame_score: int = evaluate_position_endgame(position)
+    phase: int = game_phase(position)
+    return interpolate_evaluations(midgame_score, endgame_score, phase)
+
 
 def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
     """Evaluates the given move for the side-to-move and returns a score."""
+    phase: int = game_phase(position)
     start_square: int = move[0]
     end_square: int = move[1]
     piece_moved: str = position[start_square]
     piece_captured: str = move[2]
     promotion_piece: str = move[3]
-    score: int = PIECE_SQUARE_TABLES[piece_moved][end_square] - PIECE_SQUARE_TABLES[piece_moved][start_square]
+    midgame_move_score: int = MIDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - MIDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
+    endgame_move_score: int = ENDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - ENDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
+    score: int = interpolate_evaluations(midgame_move_score, endgame_move_score, phase)
     if piece_captured.islower():  # capture
-        score += PIECE_SQUARE_TABLES[piece_captured.upper()][119 - end_square]
+        midgame_capture_score: int = MIDGAME_PIECE_VALUES[piece_captured.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][119 - end_square]
+        endgame_capture_score: int = ENDGAME_PIECE_VALUES[piece_captured.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][119 - end_square]
+        score += interpolate_evaluations(midgame_capture_score, endgame_capture_score, phase)
     if piece_moved == "K" and abs(start_square - end_square) == 2:  # castling
-        score += PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
+        midgame_castle_score: int = MIDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - MIDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
+        endgame_castle_score: int = ENDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - ENDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
+        score += interpolate_evaluations(midgame_castle_score, endgame_castle_score, phase)
     if piece_moved == "P":
         if A8 <= end_square <= H8:  # pawn promotion
-            score += PIECE_SQUARE_TABLES[promotion_piece][end_square] - PIECE_SQUARE_TABLES["P"][end_square]
-            score += PIECE_VALUES[promotion_piece] - PIECE_VALUES["P"]
+            midgame_promotion_score: int = MIDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - MIDGAME_PIECE_SQUARE_TABLES["P"][end_square] + MIDGAME_PIECE_VALUES[promotion_piece] - MIDGAME_PIECE_VALUES["P"]
+            endgame_promotion_score: int = ENDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - ENDGAME_PIECE_SQUARE_TABLES["P"][end_square] + ENDGAME_PIECE_VALUES[promotion_piece] - ENDGAME_PIECE_VALUES["P"]
+            score += interpolate_evaluations(midgame_promotion_score, endgame_promotion_score, phase)
         if end_square + SOUTH == en_passant:
-            score += PIECE_SQUARE_TABLES["P"][119 - (end_square + SOUTH)]
+            midgame_en_passant_score: int = MIDGAME_PIECE_SQUARE_TABLES["P"][119 - (end_square + SOUTH)]
+            endgame_en_passant_score: int = ENDGAME_PIECE_SQUARE_TABLES["P"][119 - (end_square + SOUTH)]
+            score += interpolate_evaluations(midgame_en_passant_score, endgame_en_passant_score, phase)
     return score
 
 
@@ -347,7 +513,7 @@ def quiescent_search(depth: int, alpha: int, beta: int, position: str, castling:
             new_position = rotate_position(*new_position)
             if not find_check(new_position[0], new_position[4]): # if the move doesn't result in our king being in check (legal move)
                 delta: int = 200
-                if stand_pat + PIECE_VALUES[move[2].upper()] + PIECE_VALUES[move[3]] + delta > alpha:  # delta pruning
+                if stand_pat + ENDGAME_PIECE_VALUES[move[2].upper()] + ENDGAME_PIECE_VALUES[move[3]] + delta > alpha:  # delta pruning
                     score: int = -quiescent_search(depth - 1, -beta, -alpha, *new_position)
                     if score >= beta:
                         return beta
@@ -429,8 +595,8 @@ def search_position(depth: int, position: str, castling: list[bool], opponent_ca
             root_call_alpha = -CHECKMATE_UPPER  # reset bounds for re-search
             root_call_beta = CHECKMATE_UPPER
         else:
-            root_call_alpha = root_call_score - (PIECE_VALUES["P"] // 2)  # set new bounds for search
-            root_call_beta = root_call_score + (PIECE_VALUES["P"] // 2)
+            root_call_alpha = root_call_score - (MIDGAME_PAWN_VALUE // 2)  # set new bounds for search
+            root_call_beta = root_call_score + (MIDGAME_PAWN_VALUE // 2)
             root_call_depth += 1  # only increase depth if we don't need to re-search
     return root_call_move_list[0]  # ordered in descending order so the first move is the best
 
@@ -553,7 +719,7 @@ def main() -> None:
                 start_square = 119 - start_square
                 end_square = 119 - end_square
             if best_move == (0, 0, "", ""):
-                move_string: str = "(none)"
+                move_string: str = "0000"
             else:
                 move_string: str = render_coordinates(start_square) + render_coordinates(end_square) + promotion_piece.lower()
             send_response(f"bestmove {move_string}")
