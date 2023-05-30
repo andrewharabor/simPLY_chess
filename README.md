@@ -20,7 +20,7 @@ A simple and minimalist chess engine written in Python. This project was heavily
 
 - Basic [transposition table](https://www.chessprogramming.org/Transposition_Table) (without hashing) to improve search times and limit redundant computation by storing the results of previous searches
 
-- 3-ply [negamax search](https://www.chessprogramming.org/Negamax) algorithm with [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) to greatly reduce the number of nodes searched by pruning branches that are either too good or too bad
+- 4-ply [negamax search](https://www.chessprogramming.org/Negamax) algorithm with [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) to greatly reduce the number of nodes searched by pruning branches that are either too good or too bad
 
 - [Quiescence search](https://www.chessprogramming.org/Quiescence_Search) to avoid the [horizon effect](https://www.chessprogramming.org/Horizon_Effect) along with [delta pruning](https://www.chessprogramming.org/Delta_Pruning) to further reduce the number of nodes searched
 
@@ -42,7 +42,7 @@ A simple and minimalist chess engine written in Python. This project was heavily
 
 - Relies on a [GUI](https://www.chessprogramming.org/GUI) for features like time control and stalemate/checkmate detection
 
-- Written in Python meaning that it isn't too strong since it can't search past a depth of 4 ply in a reasonable amount of time (even 4 is on the slow side so 3 is recommended)
+- Written in Python meaning that it isn't too strong since it can't search past a depth of 4 ply in a reasonable amount of time
 
 - Does not take [3-fold repetition](https://www.chessprogramming.org/Repetitions#Fide_Rule) or the [fifty-move-rule](https://www.chessprogramming.org/Fifty-move_Rule#Fide_Rule) into account meaning that those rules can be exploited when the engine has a winning position
 

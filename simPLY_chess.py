@@ -378,7 +378,7 @@ def rotate_position(position: str, castling: list[bool], opponent_castling: list
     return position, castling, opponent_castling, en_passant, king_passant
 
 
-def find_check(position: str, king_passant: int) -> bool:
+def king_in_check(position: str, king_passant: int) -> bool:
     """Finds if the opponent's king is in check or if they were in check before castling. Typically called after
     make_move() and rotate_position() to see if the move was legal."""
     king_position: int = position.find("k") if "k" in position else 0  # after rotating the board, our king "becomes the opponent's king" ("k") in that position
@@ -511,7 +511,7 @@ def quiescent_search(depth: int, alpha: int, beta: int, position: str, castling:
         if move[2].islower():  # capture
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
             new_position = rotate_position(*new_position)
-            if not find_check(new_position[0], new_position[4]): # if the move doesn't result in our king being in check (legal move)
+            if not king_in_check(new_position[0], new_position[4]): # if the move doesn't result in our king being in check (legal move)
                 delta: int = 200
                 if stand_pat + ENDGAME_PIECE_VALUES[move[2].upper()] + ENDGAME_PIECE_VALUES[move[3]] + delta > alpha:  # delta pruning
                     score: int = -quiescent_search(depth - 1, -beta, -alpha, *new_position)
@@ -545,7 +545,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
         for move in move_list:
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
             new_position = rotate_position(*new_position)
-            if not find_check(new_position[0], new_position[4]):  # if the move doesn't result in our king being in check (legal move)
+            if not king_in_check(new_position[0], new_position[4]):  # if the move doesn't result in our king being in check (legal move)
                 score: int = -nega_max_search(depth - 1, -beta, -alpha, *new_position)
                 moves.append((score, move))
                 if score >= beta:
@@ -558,7 +558,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
             if depth == root_call_depth:
                 root_call_move_list = []
             new_position = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
-            if find_check(new_position[0], 0):
+            if king_in_check(new_position[0], 0):
                 return -CHECKMATE_LOWER - depth
 
             else:
@@ -568,7 +568,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
             if depth == root_call_depth:  # only sort moves at the root
                 moves.sort(key=lambda pair: pair[0], reverse=True)
                 root_call_move_list = [pair[1] for pair in moves]
-            if depth > 1:  # if depth is higher, this could be increased for a more accurate transposition table
+            if depth > 1 and not king_in_check(position, king_passant):  # if depth is higher, this could be increased for a more accurate transposition table
                 TRANSPOSITION_TABLE[str(position)] = best_move
             return alpha
 
@@ -709,9 +709,7 @@ def main() -> None:
                         color = "w"
             king_passant = 0
         elif tokens[0] == "go":
-            # Even with iterative deepening and the likes, the engine is still too slow to search more than 3 ply (likely because of quiescence search).
-            # Without quiescence search, the engine is able to search 4 ply in a reasonable amount of time but move quality is sacrificed.
-            best_move: tuple[int, int, str, str] = search_position(3, position, castling, opponent_castling, en_passant, king_passant)
+            best_move: tuple[int, int, str, str] = search_position(4, position, castling, opponent_castling, en_passant, king_passant)
             start_square: int = best_move[0]
             end_square: int = best_move[1]
             promotion_piece: str = best_move[3]
