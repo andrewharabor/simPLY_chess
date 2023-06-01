@@ -396,7 +396,7 @@ def king_in_check(position: str, king_passant: int) -> bool:
     elif king_passant in [24, 26]:
         original_king_position = 25
         castled = True
-    move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling, 0)
+    move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], 0)
     for move in move_list:
         if move[1] == king_position or move[1] == king_passant:
             return True
@@ -493,13 +493,10 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
 ################
 
 
-def quiescent_search(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
+def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
     """Performs a quiescent search (searches captures only until a quiet position or max depth is reached) with delta
     pruning on the given position and returns the score found after the search."""
     stand_pat: int = evaluate_position(position)
-    if depth == 0:  # while using quiescent search with depth reduces its effectiveness, the search takes too long otherwise
-        return stand_pat
-
     if stand_pat >= beta:
         return beta
 
@@ -514,7 +511,7 @@ def quiescent_search(depth: int, alpha: int, beta: int, position: str, castling:
             if not king_in_check(new_position[0], new_position[4]): # if the move doesn't result in our king being in check (legal move)
                 delta: int = 200
                 if stand_pat + ENDGAME_PIECE_VALUES[move[2].upper()] + ENDGAME_PIECE_VALUES[move[3]] + delta > alpha:  # delta pruning
-                    score: int = -quiescent_search(depth - 1, -beta, -alpha, *new_position)
+                    score: int = -quiescent_search(-beta, -alpha, *new_position)
                     if score >= beta:
                         return beta
 
@@ -528,7 +525,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
     possible move for the side-to-move."""
     global root_call_move_list, root_call_depth
     if depth == 0:
-        return quiescent_search(root_call_depth * 4, alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        return quiescent_search(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
 
     killer_move: tuple[int, int, str, str] | None = TRANSPOSITION_TABLE.get(str(position))  # get move if we already searched this position
     if (depth != root_call_depth) and (killer_move is not None):  # using killer move at root depth defeats the purpose of iterative deepening
@@ -648,7 +645,7 @@ def load_fen(fen: str) -> tuple[str, list[bool], list[bool], int, int, str]:
     return position, castling, opponent_castling, en_passant, king_passant, color
 
 
-def create_fen(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> str:
+def generate_fen(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> str:
     """Returns a FEN string representing the given position."""
     if color == "b":
         position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
@@ -750,19 +747,20 @@ def main() -> None:
                         start_square = 119 - start_square
                         end_square = 119 - end_square
                         position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
-                        position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling, opponent_castling, en_passant, king_passant)
+                        position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant)
                         position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
                     else:  # our move so we just make it
-                        position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling, opponent_castling, en_passant, king_passant)
+                        position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant)
                 if ply % 2 == 0:  # rotate the board after the last move was made and switch the color
-                    position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling, opponent_castling, en_passant, king_passant)
+                    position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
                     if color == "w":
                         color = "b"
                     elif color == "b":
                         color = "w"
             king_passant = 0
         elif tokens[0] == "go":
-            best_move: tuple[int, int, str, str] = search_position(4, position, castling, opponent_castling, en_passant, king_passant)
+            # Depth of 4 works but the engine will be significantly slower during the middle game with no major improvement in strength
+            best_move: tuple[int, int, str, str] = search_position(3, position, castling[:], opponent_castling[:], en_passant, king_passant)
             start_square: int = best_move[0]
             end_square: int = best_move[1]
             promotion_piece: str = best_move[3]
@@ -783,7 +781,8 @@ def main() -> None:
             board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             for row in board:
                 send_response(row)
-            send_response(f"FEN: {create_fen(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
+            send_response(f"FEN: {generate_fen(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
+
 
 if __name__ == "__main__":
     main()
