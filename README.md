@@ -34,9 +34,12 @@ A simple chess engine written in Python. This project was heavily inspired by [S
   - Accepted commands:
     - `uci` - Initiates UCI protocol
     - `isready` - Synchronizes and initializes engine
+    - `quit` - Terminates the engine
     - `ucinewgame` - Notifies engine that next search will be from a different game (and resets transposition table)
-    - `position [fen <fenstring> | startpos ]  moves <move1> ... <movei>` - Sets up the board position according to the given FEN string and moves
+    - `position [fen <fenstring> | startpos ]  moves <move1> ... <movei>` - Sets up the board position according to the given FEN string and/or moves
     - `go` - Calculate the best move for the current position
+    - `eval` - Return the static evaluation of the current position
+    - `board` - Print the current board position in ASCII art and with the FEN string
 
 ## Limitations
 

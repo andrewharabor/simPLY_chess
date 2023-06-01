@@ -434,7 +434,7 @@ def evaluate_position_midgame(position: str) -> int:
         if piece.isupper():  # ally piece
             score += MIDGAME_PIECE_VALUES[piece] + MIDGAME_PIECE_SQUARE_TABLES[piece][square]
         elif piece.islower():  # opponent piece
-            score -= MIDGAME_PIECE_VALUES[piece.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece.upper()][119 - square]
+            score -= MIDGAME_PIECE_VALUES[piece.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
     return score
 
 
@@ -445,7 +445,7 @@ def evaluate_position_endgame(position: str) -> int:
         if piece.isupper():  # ally piece
             score += ENDGAME_PIECE_VALUES[piece] + ENDGAME_PIECE_SQUARE_TABLES[piece][square]
         elif piece.islower():  # opponent piece
-            score -= ENDGAME_PIECE_VALUES[piece.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece.upper()][119 - square]
+            score -= ENDGAME_PIECE_VALUES[piece.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
     return score
 
 
@@ -469,8 +469,8 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
     endgame_move_score: int = ENDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - ENDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
     score: int = interpolate_evaluations(midgame_move_score, endgame_move_score, phase)
     if piece_captured.islower():  # capture
-        midgame_capture_score: int = MIDGAME_PIECE_VALUES[piece_captured.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][119 - end_square]
-        endgame_capture_score: int = ENDGAME_PIECE_VALUES[piece_captured.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][119 - end_square]
+        midgame_capture_score: int = MIDGAME_PIECE_VALUES[piece_captured.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
+        endgame_capture_score: int = ENDGAME_PIECE_VALUES[piece_captured.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
         score += interpolate_evaluations(midgame_capture_score, endgame_capture_score, phase)
     if piece_moved == "K" and abs(start_square - end_square) == 2:  # castling
         midgame_castle_score: int = MIDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - MIDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
@@ -482,8 +482,8 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
             endgame_promotion_score: int = ENDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - ENDGAME_PIECE_SQUARE_TABLES["P"][end_square] + ENDGAME_PIECE_VALUES[promotion_piece] - ENDGAME_PIECE_VALUES["P"]
             score += interpolate_evaluations(midgame_promotion_score, endgame_promotion_score, phase)
         if end_square + SOUTH == en_passant:
-            midgame_en_passant_score: int = MIDGAME_PIECE_SQUARE_TABLES["P"][119 - (end_square + SOUTH)]
-            endgame_en_passant_score: int = ENDGAME_PIECE_SQUARE_TABLES["P"][119 - (end_square + SOUTH)]
+            midgame_en_passant_score: int = MIDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
+            endgame_en_passant_score: int = ENDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
             score += interpolate_evaluations(midgame_en_passant_score, endgame_en_passant_score, phase)
     return score
 
@@ -620,7 +620,7 @@ def render_coordinates(index: int) -> str:
 
 
 def load_fen(fen: str) -> tuple[str, list[bool], list[bool], int, int, str]:
-    """Configures the board according to the given FEN string and returns the board information."""
+    """Configures the board according to the given FEN string and returns the position information."""
     list_position: list[str] = [" "] * 120
     fields: list[str] = fen.split(" ")
     rows: list[str] = fields[0].split("/")
@@ -644,8 +644,61 @@ def load_fen(fen: str) -> tuple[str, list[bool], list[bool], int, int, str]:
     king_passant: int = 0
     color = fields[1]
     if color == "b":
-        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling, opponent_castling, en_passant, king_passant)
+        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
     return position, castling, opponent_castling, en_passant, king_passant, color
+
+
+def create_fen(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> str:
+    """Returns a FEN string representing the given position."""
+    if color == "b":
+        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+    fen: str = ""
+    for rank in range(8):
+        empty_squares: int = 0
+        for file in range(8):
+            piece: str = position[(10 * (rank + 2)) + file + 1]
+            if piece == ".":
+                empty_squares += 1
+            else:
+                if empty_squares > 0:
+                    fen += str(empty_squares)
+                    empty_squares = 0
+                fen += piece
+        if empty_squares > 0:
+            fen += str(empty_squares)
+        if rank < 7:
+            fen += "/"
+    fen += " w" if color == "w" else " b"
+    if castling[0] or castling[1] or opponent_castling[0] or opponent_castling[1]:
+        fen += " "
+        fen += "K" if castling[1] else ""
+        fen += "Q" if castling[0] else ""
+        fen += "k" if opponent_castling[1] else ""
+        fen += "q" if opponent_castling[0] else ""
+    else:
+        fen += " -"
+    fen += " -" if en_passant == 0 else f" {render_coordinates(en_passant)}"
+    fen += " 0 1"  # halfmove clock and fullmove number are not used
+    return fen
+
+
+def display_board(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> list[str]:
+    """Converts the position into a list of strings in which each string represents a row in an ASCII display of the
+    board."""
+    if color == "b":
+        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+    board: list[str] = []
+    for rank in range(8):
+        board.append("+---+---+---+---+---+---+---+---+")
+        row: str = "|"
+        for file in range(8):
+            piece: str = position[(10 * (rank + 2)) + file + 1]
+            row += (f" {piece if piece != '.' else ' '} |")
+        row += (f" {str(8 - rank)}")
+        board.append("".join(row))
+    board.append("+---+---+---+---+---+---+---+---+")
+    board.append("  a   b   c   d   e   f   g   h")
+    return board
 
 
 def send_response(response: str) -> None:
@@ -696,9 +749,9 @@ def main() -> None:
                     if ply % 2 == 1:  # opponent's move so we flip the coordinates, then rotate the board before and after making the move
                         start_square = 119 - start_square
                         end_square = 119 - end_square
-                        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling, opponent_castling, en_passant, king_passant)
+                        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
                         position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling, opponent_castling, en_passant, king_passant)
-                        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling, opponent_castling, en_passant, king_passant)
+                        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
                     else:  # our move so we just make it
                         position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling, opponent_castling, en_passant, king_passant)
                 if ply % 2 == 0:  # rotate the board after the last move was made and switch the color
@@ -721,7 +774,16 @@ def main() -> None:
             else:
                 move_string: str = render_coordinates(start_square) + render_coordinates(end_square) + promotion_piece.lower()
             send_response(f"bestmove {move_string}")
-
+        elif tokens[0] == "eval":
+            score: float = evaluate_position(position) / 100
+            if color == "b":
+                score *= -1
+            send_response(f"static evaluation: {score}")
+        elif tokens[0] == "board":
+            board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+            for row in board:
+                send_response(row)
+            send_response(f"FEN: {create_fen(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
 
 if __name__ == "__main__":
     main()
