@@ -776,7 +776,7 @@ def main() -> None:
             score: float = evaluate_position(position) / 100
             if color == "b":
                 score *= -1
-            send_response(f"static evaluation: {score}")
+            send_response(f"static evaluation: {'+' if str(score)[0] != '-' else ''}{score}")
         elif tokens[0] == "board":
             board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             for row in board:
