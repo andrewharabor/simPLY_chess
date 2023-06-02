@@ -494,14 +494,15 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
 
 
 def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
-    """Performs a quiescent search (searches captures only until a quiet position or max depth is reached) with delta
-    pruning on the given position and returns the score found after the search."""
+    """Performs a fail-soft quiescent search (searches captures only until a quiet position or max depth is reached) with
+    delta pruning on the given position and returns the score found after the search."""
     stand_pat: int = evaluate_position(position)
     if stand_pat >= beta:
-        return beta
+        return stand_pat
 
     if alpha < stand_pat:
         alpha = stand_pat
+    best_score: int = -CHECKMATE_LOWER  # fail-soft framework
     move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
     move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
     for move in move_list:
@@ -513,15 +514,17 @@ def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool],
                 if stand_pat + ENDGAME_PIECE_VALUES[move[2].upper()] + ENDGAME_PIECE_VALUES[move[3]] + delta > alpha:  # delta pruning
                     score: int = -quiescent_search(-beta, -alpha, *new_position)
                     if score >= beta:
-                        return beta
+                        return best_score  # fail-soft beta cutoff
 
                     if score > alpha:
                         alpha = score
-    return alpha
+                    if score > best_score:
+                        best_score = score
+    return best_score
 
 
 def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
-    """Performs a negamax search with alpha-beta pruning on the given position and returns the score of the best
+    """Performs a fail-soft negamax search with alpha-beta pruning on the given position and returns the score of the best
     possible move for the side-to-move."""
     global root_call_move_list, root_call_depth
     if depth == 0:
@@ -532,6 +535,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
         return evaluate_position(position)
 
     else:
+        best_score: int = -CHECKMATE_LOWER  # fail-soft framework means we need to keep track of the best score which may be outside of alpha-beta bounds
         moves: list[tuple[int, tuple[int, int, str, str]]] = []  # list of tuples containing the score and move
         if depth == root_call_depth:
             move_list: list[tuple[int, int, str, str]] = root_call_move_list  # use the sorted move list from the root call
@@ -546,10 +550,12 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
                 score: int = -nega_max_search(depth - 1, -beta, -alpha, *new_position)
                 moves.append((score, move))
                 if score >= beta:
-                    return beta  # fail-hard beta cutoff
+                    return score  # fail-soft beta cutoff
 
                 if score > alpha:
                     alpha = score
+                if score > best_score:
+                    best_score = score
                     best_move = move
         if len(moves) == 0:  # if there are no legal moves, it's either checkmate or stalemate.
             if depth == root_call_depth:
@@ -567,7 +573,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
                 root_call_move_list = [pair[1] for pair in moves]
             if depth > 1 and best_move != (0, 0, "", ""):  # if depth is higher, this could be increased for a more accurate transposition table
                 TRANSPOSITION_TABLE[str(position)] = best_move
-            return alpha
+            return best_score
 
 
 root_call_move_list: list[tuple[int, int, str, str]]
@@ -588,9 +594,10 @@ def search_position(depth: int, position: str, castling: list[bool], opponent_ca
         root_call_score = nega_max_search(root_call_depth, root_call_alpha, root_call_beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
         if len(root_call_move_list) == 0:  # current position is checkmate or stalemate, return empty move
             return (0, 0, "", "")
-        if root_call_score >= root_call_beta:  # search resulted in fail-hard beta cutoff so we need to re-search
-            root_call_alpha = -CHECKMATE_UPPER  # reset bounds for re-search
-            root_call_beta = CHECKMATE_UPPER
+        if root_call_score >= root_call_beta: # fail-high beta cutoff
+            root_call_beta = CHECKMATE_UPPER  # only update the bound that failed
+        elif root_call_score <= root_call_alpha:  # fail-low alpha cutoff
+            root_call_alpha = -CHECKMATE_UPPER
         else:
             root_call_alpha = root_call_score - (MIDGAME_PAWN_VALUE // 2)  # set new bounds for search
             root_call_beta = root_call_score + (MIDGAME_PAWN_VALUE // 2)
