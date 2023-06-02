@@ -502,7 +502,7 @@ def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool],
 
     if alpha < stand_pat:
         alpha = stand_pat
-    best_score: int = -CHECKMATE_LOWER  # fail-soft framework
+    best_score: int = -CHECKMATE_UPPER  # fail-soft framework means we need to keep track of the best score which may be outside of alpha-beta bounds
     move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
     move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
     for move in move_list:
@@ -535,7 +535,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
         return evaluate_position(position)
 
     else:
-        best_score: int = -CHECKMATE_LOWER  # fail-soft framework means we need to keep track of the best score which may be outside of alpha-beta bounds
+        best_score: int = -CHECKMATE_UPPER  # fail-soft framework means we need to keep track of the best score which may be outside of alpha-beta bounds
         moves: list[tuple[int, tuple[int, int, str, str]]] = []  # list of tuples containing the score and move
         if depth == root_call_depth:
             move_list: list[tuple[int, int, str, str]] = root_call_move_list  # use the sorted move list from the root call
