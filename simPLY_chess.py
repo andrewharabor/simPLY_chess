@@ -562,8 +562,8 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
                 return 0
 
         else:
-            if depth == root_call_depth:  # only sort moves at the root
-                moves.sort(key=lambda pair: pair[0], reverse=True)
+            if depth == root_call_depth:
+                moves.sort(key=lambda pair: pair[0], reverse=True)  # sort moves for move ordering at root depth
                 root_call_move_list = [pair[1] for pair in moves]
             if depth > 1 and best_move != (0, 0, "", ""):  # if depth is higher, this could be increased for a more accurate transposition table
                 TRANSPOSITION_TABLE[str(position)] = best_move
@@ -598,9 +598,9 @@ def search_position(depth: int, position: str, castling: list[bool], opponent_ca
     return root_call_move_list[0]  # ordered in descending order so the first move is the best
 
 
-################
-# UCI PROTOCOL #
-################
+#####################
+# UTILITY FUNCTIONS #
+#####################
 
 def parse_coordinates(coordinate: str) -> int:
     """Converts a coordinate string (e.g. "a1") to an integer matching an index in the board representation."""
@@ -674,7 +674,7 @@ def generate_fen(position: str, castling: list[bool], opponent_castling: list[bo
         fen += "q" if opponent_castling[0] else ""
     else:
         fen += " -"
-    fen += " -" if en_passant == 0 else f" {render_coordinates(en_passant)}"
+    fen += " -" if en_passant == 0 or en_passant == 119 else f" {render_coordinates(en_passant)}"
     fen += " 0 1"  # halfmove clock and fullmove number are not used
     return fen
 
@@ -697,6 +697,10 @@ def display_board(position: str, castling: list[bool], opponent_castling: list[b
     board.append("  a   b   c   d   e   f   g   h")
     return board
 
+
+################
+# UCI PROTOCOL #
+################
 
 def send_response(response: str) -> None:
     """Sends the given response to the stdout, flushing the buffer."""
