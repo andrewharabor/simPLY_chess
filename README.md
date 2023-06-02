@@ -53,4 +53,4 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 ## My Thoughts
 
-I decided to program this engine because I enjoy playing chess and I figured it would be a challenging project. Despite all of its limitations, the engine actually plays well enough to draw with and even beat me sometimes. There are many ways I could improve the playing strength of the engine (both through new features and optimizations), but for now, I'll just leave it as is. Overall, I learned a lot about search algorithms and I really enjoyed working through this project.
+I decided to program this engine because I enjoy playing chess and I figured it would be a challenging project. Despite all of its limitations, the engine actually plays well enough to draw with and even beat me sometimes. There are many ways I could improve the playing strength of the engine (both through new features and optimizations), but for now, I'll just leave it as is with maybe a few changes here and there. Overall, this project helped me learn a lot and I really enjoyed developing it.
