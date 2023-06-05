@@ -494,15 +494,14 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
 
 
 def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
-    """Performs a fail-soft quiescent search (searches captures only until a quiet position or max depth is reached) with
-    delta pruning on the given position and returns the score found after the search."""
+    """Performs a quiescent search (searches captures only until a quiet position is reached) with delta pruning on the
+    given position and returns the score found after the search."""
     stand_pat: int = evaluate_position(position)
     if stand_pat >= beta:
         return stand_pat
 
     if alpha < stand_pat:
         alpha = stand_pat
-    best_score: int = -CHECKMATE_UPPER  # fail-soft framework means we need to keep track of the best score which may be outside of alpha-beta bounds
     move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
     move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
     for move in move_list:
@@ -514,13 +513,11 @@ def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool],
                 if stand_pat + ENDGAME_PIECE_VALUES[move[2].upper()] + ENDGAME_PIECE_VALUES[move[3]] + delta > alpha:  # delta pruning
                     score: int = -quiescent_search(-beta, -alpha, *new_position)
                     if score >= beta:
-                        return best_score  # fail-soft beta cutoff
+                        return beta # fail-hard beta cutoff
 
                     if score > alpha:
                         alpha = score
-                    if score > best_score:
-                        best_score = score
-    return best_score
+    return alpha
 
 
 def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
@@ -594,9 +591,9 @@ def search_position(depth: int, position: str, castling: list[bool], opponent_ca
         root_call_score = nega_max_search(root_call_depth, root_call_alpha, root_call_beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
         if len(root_call_move_list) == 0:  # current position is checkmate or stalemate, return empty move
             return (0, 0, "", "")
-        if root_call_score >= root_call_beta: # fail-high beta cutoff
+        if root_call_score > root_call_beta: # fail-high beta cutoff
             root_call_beta = CHECKMATE_UPPER  # only update the bound that failed
-        elif root_call_score <= root_call_alpha:  # fail-low alpha cutoff
+        elif root_call_score < root_call_alpha:  # fail-low alpha cutoff
             root_call_alpha = -CHECKMATE_UPPER
         else:
             root_call_alpha = root_call_score - (MIDGAME_PAWN_VALUE // 2)  # set new bounds for search
