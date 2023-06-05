@@ -291,8 +291,8 @@ TOTAL_PHASE: int = 16 * PAWN_PHASE + 4 * KNIGHT_PHASE + 4 * BISHOP_PHASE + 4 * R
 ###############
 
 def generate_moves(position: str, castling: list[bool], en_passant: int) -> list[tuple[int, int, str, str]]:
-    """Generates all pseudo-legal moves for a given position. Returns as a list:
-    [start_square, end_square, piece_captured, promotion_piece]."""
+    """Generates all pseudo-legal moves for a given position. Moves are represented as tuples:
+    (start_square, end_square, piece_captured, promotion_piece)"""
     move_list: list[tuple[int, int, str, str]] = []
     for start_square in range(len(position)):
         if position[start_square].isupper():  # piece is current player's
