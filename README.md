@@ -24,10 +24,6 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 - [Quiescence search](https://www.chessprogramming.org/Quiescence_Search) to avoid the [horizon effect](https://www.chessprogramming.org/Horizon_Effect) along with [delta pruning](https://www.chessprogramming.org/Delta_Pruning) to further reduce the number of nodes searched
 
-- [Iterative deepening](https://www.chessprogramming.org/Iterative_Deepening) framework to counter-intuitively speed up search times through simplified [PV move ordering](https://www.chessprogramming.org/Move_Ordering) from the last fully-completed search
-
-- Utilizes [aspiration windows](https://www.chessprogramming.org/Aspiration_Windows) in order to improve the effectiveness of [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) by tightening the bounds of the search window
-
 - [Tapered evaluation](https://www.chessprogramming.org/Tapered_Eval) to interpolate between the evaluation of the position using middlegame and endgame criteria
 
 - Communicates through standard [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) protocol to allow for easy integration into any [GUI](https://www.chessprogramming.org/GUI)
@@ -45,12 +41,14 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 - Relies on a [GUI](https://www.chessprogramming.org/GUI) for features like time control and stalemate/checkmate detection
 
-- Written in Python meaning that it isn't too strong since it can't search past a depth of 4 ply in a reasonable amount of time
+- Written in Python meaning that it isn't too strong since it can't search past a depth of 4-ply in a reasonable amount of time
 
-- Does not take [3-fold repetition](https://www.chessprogramming.org/Repetitions#Fide_Rule) or the [fifty-move-rule](https://www.chessprogramming.org/Fifty-move_Rule#Fide_Rule) into account meaning that those rules can be exploited when the engine has a winning position
+- Does not take 3-fold repetition or the fifty-move-rule into account meaning that those rules can be exploited when the engine has a winning position
 
-- Does not have an [opening book](https://www.chessprogramming.org/Opening_Book) meaning that it has almost no variation in the [opening](https://www.chessprogramming.org/Opening) stage of the game
+- Does not have an [opening book](https://www.chessprogramming.org/Opening_Book) meaning that it has almost no variation in the opening stage of the game
+
+- Still lacks various other [search](https://www.chessprogramming.org/Search) techniques that could improve its speed and strength
 
 ## My Thoughts
 
-I decided to program this engine because I enjoy playing chess and I figured it would be a challenging project. Despite all of its limitations, the engine actually plays well enough to draw with and even beat me sometimes. There are many ways I could improve the playing strength of the engine (both through new features and optimizations), but for now, I'll just leave it as is with maybe a few changes here and there. Overall, this project helped me learn a lot and I really enjoyed developing it.
+I decided to program this engine because I enjoy playing chess and I figured it would be a challenging project. Despite all of its limitations, the engine actually plays well enough to draw with and even beat me sometimes. There are many ways I could improve the playing strength and speend of the engine and while I tried in various ways to do so, it sidetracked me from my original with this project. That being said, I'll just leave the engine as it is for now and maybe come back to it in the future. Overall, I'm happy with the result and I learned a lot about search algorithms and chess programming in the process.
