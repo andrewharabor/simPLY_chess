@@ -509,7 +509,6 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
 # SEARCH LOGIC #
 ################
 
-
 def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
     """Performs a fail-hard quiescent search (searches captures only until a quiet position is reached) with delta
     pruning on the given position and returns the score found after the search."""
