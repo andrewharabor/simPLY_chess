@@ -10,7 +10,7 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
  ![ ](game.gif)
 
- _A game that I (with the black pieces) played against simPLY_chess and won_
+ _A game that I (with the black pieces) played against simPLY_chess and won._
 
 ## Features
 
@@ -20,7 +20,7 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 - Basic [transposition table](https://www.chessprogramming.org/Transposition_Table) (without hashing) to improve search times and limit redundant computation by storing the results of previous searches
 
-- 3-ply [negamax search](https://www.chessprogramming.org/Negamax) algorithm with [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) to greatly reduce the number of nodes searched by pruning branches that are either too good or too bad
+- 4-ply [negamax search](https://www.chessprogramming.org/Negamax) algorithm with [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) to greatly reduce the number of nodes searched by pruning branches that are either too good or too bad
 
 - [Quiescence search](https://www.chessprogramming.org/Quiescence_Search) to avoid the [horizon effect](https://www.chessprogramming.org/Horizon_Effect) along with [delta pruning](https://www.chessprogramming.org/Delta_Pruning) to further reduce the number of nodes searched
 

@@ -457,35 +457,52 @@ def evaluate_position(position: str) -> int:
     return interpolate_evaluations(midgame_score, endgame_score, phase)
 
 
-def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
-    """Evaluates the given move for the side-to-move and returns a score."""
-    phase: int = game_phase(position)
+def evaluate_move_midgame(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
+    """Evaluates the given move for the side-to-move using the midgame piece values and piece-square tables."""
     start_square: int = move[0]
     end_square: int = move[1]
     piece_moved: str = position[start_square]
     piece_captured: str = move[2]
     promotion_piece: str = move[3]
-    midgame_move_score: int = MIDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - MIDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
-    endgame_move_score: int = ENDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - ENDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
-    score: int = interpolate_evaluations(midgame_move_score, endgame_move_score, phase)
+    score: int = MIDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - MIDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
     if piece_captured.islower():  # capture
-        midgame_capture_score: int = MIDGAME_PIECE_VALUES[piece_captured.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
-        endgame_capture_score: int = ENDGAME_PIECE_VALUES[piece_captured.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
-        score += interpolate_evaluations(midgame_capture_score, endgame_capture_score, phase)
+        score += MIDGAME_PIECE_VALUES[piece_captured.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
     if piece_moved == "K" and abs(start_square - end_square) == 2:  # castling
-        midgame_castle_score: int = MIDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - MIDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
-        endgame_castle_score: int = ENDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - ENDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
-        score += interpolate_evaluations(midgame_castle_score, endgame_castle_score, phase)
+        score += MIDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - MIDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
     if piece_moved == "P":
         if A8 <= end_square <= H8:  # pawn promotion
-            midgame_promotion_score: int = MIDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - MIDGAME_PIECE_SQUARE_TABLES["P"][end_square] + MIDGAME_PIECE_VALUES[promotion_piece] - MIDGAME_PIECE_VALUES["P"]
-            endgame_promotion_score: int = ENDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - ENDGAME_PIECE_SQUARE_TABLES["P"][end_square] + ENDGAME_PIECE_VALUES[promotion_piece] - ENDGAME_PIECE_VALUES["P"]
-            score += interpolate_evaluations(midgame_promotion_score, endgame_promotion_score, phase)
+            score += MIDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - MIDGAME_PIECE_SQUARE_TABLES["P"][end_square] + MIDGAME_PIECE_VALUES[promotion_piece] - MIDGAME_PIECE_VALUES["P"]
         if end_square + SOUTH == en_passant:
-            midgame_en_passant_score: int = MIDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
-            endgame_en_passant_score: int = ENDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
-            score += interpolate_evaluations(midgame_en_passant_score, endgame_en_passant_score, phase)
+            score += MIDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
     return score
+
+
+def evaluate_move_endgame(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
+    """Evaluates the given move for the side-to-move using the endgame piece values and piece-square tables."""
+    start_square: int = move[0]
+    end_square: int = move[1]
+    piece_moved: str = position[start_square]
+    piece_captured: str = move[2]
+    promotion_piece: str = move[3]
+    score: int = ENDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - ENDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
+    if piece_captured.islower():  # capture
+        score += ENDGAME_PIECE_VALUES[piece_captured.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
+    if piece_moved == "K" and abs(start_square - end_square) == 2:  # castling
+        score += ENDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - ENDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
+    if piece_moved == "P":
+        if A8 <= end_square <= H8:  # pawn promotion
+            score += ENDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - ENDGAME_PIECE_SQUARE_TABLES["P"][end_square] + ENDGAME_PIECE_VALUES[promotion_piece] - ENDGAME_PIECE_VALUES["P"]
+        if end_square + SOUTH == en_passant:
+            score += ENDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
+    return score
+
+
+def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
+    """Evaluates the given move for the side-to-move by interpolating between the midgame and endgame evaluations."""
+    midgame_score: int = evaluate_move_midgame(move, position, en_passant)
+    endgame_score: int = evaluate_move_endgame(move, position, en_passant)
+    phase: int = game_phase(position)
+    return interpolate_evaluations(midgame_score, endgame_score, phase)
 
 
 ################
@@ -494,8 +511,8 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
 
 
 def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
-    """Performs a quiescent search (searches captures only until a quiet position is reached) with delta pruning on the
-    given position and returns the score found after the search."""
+    """Performs a fail-hard quiescent search (searches captures only until a quiet position is reached) with delta
+    pruning on the given position and returns the score found after the search."""
     stand_pat: int = evaluate_position(position)
     if stand_pat >= beta:
         return stand_pat
@@ -527,25 +544,24 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
     if depth == 0:
         return quiescent_search(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
 
-    killer_move: tuple[int, int, str, str] | None = TRANSPOSITION_TABLE.get(str(position))  # get move if we already searched this position
+    killer_move: tuple[int, int, str, str] | None = TRANSPOSITION_TABLE.get(str(position))
     if (depth != root_call_depth) and (killer_move is not None):  # using killer move at root depth defeats the purpose of iterative deepening
         return evaluate_position(position)
 
     else:
         best_score: int = -CHECKMATE_UPPER  # fail-soft framework means we need to keep track of the best score which may be outside of alpha-beta bounds
-        moves: list[tuple[int, tuple[int, int, str, str]]] = []  # list of tuples containing the score and move
+        scored_moves: list[tuple[int, tuple[int, int, str, str]]] = []
         if depth == root_call_depth:
             move_list: list[tuple[int, int, str, str]] = root_call_move_list  # use the sorted move list from the root call
         else:
             move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
-            move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
         best_move: tuple[int, int, str, str] = (0, 0, "", "")
         for move in move_list:
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
             new_position = rotate_position(*new_position)
             if not king_in_check(new_position[0], new_position[4]):  # if the move doesn't result in our king being in check (legal move)
                 score: int = -nega_max_search(depth - 1, -beta, -alpha, *new_position)
-                moves.append((score, move))
+                scored_moves.append((score, move))
                 if score >= beta:
                     return score  # fail-soft beta cutoff
 
@@ -554,7 +570,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
                 if score > best_score:
                     best_score = score
                     best_move = move
-        if len(moves) == 0:  # if there are no legal moves, it's either checkmate or stalemate.
+        if len(scored_moves) == 0:  # if there are no legal moves, it's either checkmate or stalemate.
             if depth == root_call_depth:
                 root_call_move_list = []
             new_position = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
@@ -566,9 +582,9 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
 
         else:
             if depth == root_call_depth:
-                moves.sort(key=lambda pair: pair[0], reverse=True)  # sort moves for move ordering at root depth
-                root_call_move_list = [pair[1] for pair in moves]
-            if depth > 1 and best_move != (0, 0, "", ""):  # if depth is higher, this could be increased for a more accurate transposition table
+                scored_moves.sort(key=lambda pair: pair[0], reverse=True)  # sort moves for move ordering at root depth
+                root_call_move_list = [pair[1] for pair in scored_moves]
+            if depth >= 2 and best_move != (0, 0, "", ""):
                 TRANSPOSITION_TABLE[str(position)] = best_move
             return best_score
 
@@ -578,7 +594,7 @@ root_call_depth: int
 
 def search_position(depth: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, int, str, str]:
     """Searches the given position and returns the best move found. Acts as root call for negamax search with
-    alpha-beta pruning with quiescent search with delta pruning within an iterative deepening framework that utilizes
+    alpha-beta pruning, quiescent search, and delta pruning within an iterative deepening framework that utilizes
     aspiration windows."""
     global root_call_move_list, root_call_depth
     root_call_move_list = generate_moves(position, castling[:], en_passant)
@@ -767,8 +783,8 @@ def main() -> None:
                         color = "w"
             king_passant = 0
         elif tokens[0] == "go":
-            # Depth of 4 works but the engine will be significantly slower during the middle game with no major improvement in strength
-            best_move: tuple[int, int, str, str] = search_position(3, position, castling[:], opponent_castling[:], en_passant, king_passant)
+            # Depth 4 makes the engine a bit slow in the middle game but it should be fine since the opening and endgame usually take less time
+            best_move: tuple[int, int, str, str] = search_position(4, position, castling[:], opponent_castling[:], en_passant, king_passant)
             start_square: int = best_move[0]
             end_square: int = best_move[1]
             promotion_piece: str = best_move[3]
