@@ -555,6 +555,7 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
             move_list: list[tuple[int, int, str, str]] = root_call_move_list  # use the sorted move list from the root call
         else:
             move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
+            move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
         best_move: tuple[int, int, str, str] = (0, 0, "", "")
         for move in move_list:
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
