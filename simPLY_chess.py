@@ -278,13 +278,22 @@ for piece in "PNBRQK":
 CHECKMATE_UPPER: int = MIDGAME_KING_VALUE + 10 * MIDGAME_QUEEN_VALUE
 CHECKMATE_LOWER: int = MIDGAME_KING_VALUE - 10 * MIDGAME_QUEEN_VALUE
 
-# Game phase constants (used to interpolate between midgame and endgame evaluations)
+# Game phase constants
 PAWN_PHASE: int = 0
 KNIGHT_PHASE: int = 1
 BISHOP_PHASE: int = 1
 ROOK_PHASE: int = 2
 QUEEN_PHASE: int = 4
 TOTAL_PHASE: int = 16 * PAWN_PHASE + 4 * KNIGHT_PHASE + 4 * BISHOP_PHASE + 4 * ROOK_PHASE + 2 * QUEEN_PHASE
+
+# Main loop constants
+max_depth: int = 0
+nodes: int = 0
+quiesce_nodes: int = 0
+time_limit: float = 0
+start_time: float = 0
+verbose: bool = False
+
 
 
 ###############
@@ -513,10 +522,11 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
 def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, bool]:
     """Performs a fail-hard quiescent search (searches captures only until a quiet position is reached) with delta
     pruning. Returns the evaluation of the position and a timeout flag."""
-    global start_time, think_time
-    if time() - start_time > think_time:
+    global quiesce_nodes, start_time, time_limit
+    if time() - start_time > time_limit:
         return 0, True
 
+    quiesce_nodes += 1
     stand_pat: int = evaluate_position(position)
     if stand_pat >= beta:
         return stand_pat, False
@@ -549,10 +559,11 @@ def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent
 def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, tuple[int, int, str, str], bool]:
     """Performs a fail-hard negamax search with alpha-beta pruning on the given position, returning the best score and
     move found after the search along with a timeout flag."""
-    global max_depth, start_time, think_time
-    if time() - start_time > think_time:
+    global max_depth, nodes, start_time, time_limit
+    if time() - start_time > time_limit:
         return 0, (0, 0, "", ""), True
 
+    nodes += 1
     if depth == 0:
         score: int
         timeout: bool
@@ -608,12 +619,19 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
 def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, int, str, str]:
     """Wraps the negamax search function in an iterative deepening loop, utilizing the transposition table and PV move
     ordering to improve search efficiency."""
+    global max_depth, nodes, quiesce_nodes, start_time, time_limit, verbose
+    score: int
     best_move: tuple[int, int, str, str] = (0, 0, "", "")
     previous_best_move: tuple[int, int, str, str] = (0, 0, "", "")
     timeout: bool = False
-    global max_depth, start_time, think_time
     for max_depth in range(1, depth + 1):
-        _, best_move, timeout = nega_max(max_depth, -CHECKMATE_UPPER, CHECKMATE_UPPER, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        nodes, quiesce_nodes = 0, 0
+        score, best_move, timeout = nega_max(max_depth, -CHECKMATE_UPPER, CHECKMATE_UPPER, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        if verbose:
+            display_move: str = algebraic_notation(best_move)
+            display_score: float = (score / 100) * (-1 if color == "b" else 1)
+            display_time: float = round(time() - start_time, 3)
+            send_response(f"depth: {max_depth}, move: {display_move}, score: {'+' if str(display_score)[0] != '-' else ''}{display_score}, nodes: {nodes}, q_nodes: {quiesce_nodes}, time: {display_time}, timeout: {timeout}")
         if timeout:
             best_move = previous_best_move
             break
@@ -639,6 +657,21 @@ def render_coordinates(index: int) -> str:
     rank: int = (index - A1) // 10
     file: int = (index - A1) % 10
     return chr(ord("a") + file) + str(1 - rank)
+
+
+def algebraic_notation(move: tuple[int, int, str, str]) -> str:
+    """Converts a move from the internal representation to long algebraic notation"""
+    start_square: int = move[0]
+    end_square: int = move[1]
+    promotion_piece: str = move[3]
+    if color == "b":
+        start_square = 119 - start_square
+        end_square = 119 - end_square
+    if move == (0, 0, "", ""):
+        return "(none)"
+
+    else:
+        return render_coordinates(start_square) + render_coordinates(end_square) + promotion_piece.lower()
 
 
 def load_fen(fen: str) -> tuple[str, list[bool], list[bool], int, int, str]:
@@ -732,12 +765,10 @@ def send_response(response: str) -> None:
     sys.stdout.write(response + "\n")
     sys.stdout.flush()
 
-think_time: float
-start_time: float
 
 def main() -> None:
     """The main UCI loop responsible for parsing commands and sending responses."""
-    global position, castling, opponent_castling, en_passant, king_passant, color, think_time, start_time
+    global position, castling, opponent_castling, en_passant, king_passant, color, time_limit, start_time, verbose
     while True:
         command: str = sys.stdin.readline().strip()
         tokens: list[str] = command.split()
@@ -790,51 +821,47 @@ def main() -> None:
                         color = "w"
             king_passant = 0
         elif tokens[0] == "go":
-            depth: int = 4
-            white_time: int = 216000  # all times are in seconds
-            black_time: int = 216000  # time control is effectively unlimited if not specified
-            white_increment: int = 0
-            black_increment: int = 0
+            depth: int = 5
+            white_time: float = 600  # all times are in seconds
+            black_time: float = 600
+            white_increment: float = 0
+            black_increment: float = 0
             if "depth" in tokens:
                 depth_index: int = tokens.index("depth") + 1
                 if tokens[depth_index].isdigit():
                     depth = int(tokens[depth_index])
-            if "wtime" in tokens:
-                white_time_index: int = tokens.index("wtime") + 1
-                if tokens[white_time_index].isdigit():
-                    white_time = int(tokens[white_time_index]) / 1000
-            if "btime" in tokens:
-                black_time_index: int = tokens.index("btime") + 1
-                if tokens[black_time_index].isdigit():
-                    black_time = int(tokens[black_time_index]) / 1000
-            if "winc" in tokens:
-                white_increment_index: int = tokens.index("winc") + 1
-                if tokens[white_increment_index].isdigit():
-                    white_increment = int(tokens[white_increment_index]) / 1000
-            if "binc" in tokens:
-                black_increment_index: int = tokens.index("binc") + 1
-                if tokens[black_increment_index].isdigit():
-                    black_increment = int(tokens[black_increment_index]) / 1000
+                white_time = 216000  # if depth is specified, unlimited time is assumed
+                black_time = 216000
+                white_increment = 0
+                black_increment = 0
+            else:
+                depth = 30  # if time is specified, unlimited depth is assumed
+                if "wtime" in tokens:
+                    white_time_index: int = tokens.index("wtime") + 1
+                    if tokens[white_time_index].isdigit():
+                        white_time = int(tokens[white_time_index]) / 1000
+                if "btime" in tokens:
+                    black_time_index: int = tokens.index("btime") + 1
+                    if tokens[black_time_index].isdigit():
+                        black_time = int(tokens[black_time_index]) / 1000
+                if "winc" in tokens:
+                    white_increment_index: int = tokens.index("winc") + 1
+                    if tokens[white_increment_index].isdigit():
+                        white_increment = int(tokens[white_increment_index]) / 1000
+                if "binc" in tokens:
+                    black_increment_index: int = tokens.index("binc") + 1
+                    if tokens[black_increment_index].isdigit():
+                        black_increment = int(tokens[black_increment_index]) / 1000
             if color == 'b':
                 white_time, black_time = black_time, white_time
                 white_increment, black_increment = black_increment, white_increment
             if white_time <= 30:
-                think_time = 1  # leave room for up to 30 more moves if time is below 30 seconds
+                time_limit = 1  # leave room for up to 30 more moves if time is below 30 seconds
             else:
-                think_time = white_time / 60 + white_increment
+                time_limit = white_time / 60 + white_increment
             start_time = time()
             best_move: tuple[int, int, str, str] = iteratively_deepen(depth, position, castling[:], opponent_castling[:], en_passant, king_passant)
-            start_square: int = best_move[0]
-            end_square: int = best_move[1]
-            promotion_piece: str = best_move[3]
-            if color == "b":
-                start_square = 119 - start_square
-                end_square = 119 - end_square
-            if best_move == (0, 0, "", ""):
-                move_string: str = "(none)"
-            else:
-                move_string: str = render_coordinates(start_square) + render_coordinates(end_square) + promotion_piece.lower()
-            send_response(f"bestmove {move_string}")
+            send_response(f"bestmove {algebraic_notation(best_move)}")
         elif tokens[0] == "eval":
             midgame_score: float = evaluate_position_midgame(position) / 100
             endgame_score: float = evaluate_position_endgame(position) / 100
@@ -843,9 +870,12 @@ def main() -> None:
                 midgame_score *= -1
                 endgame_score *= -1
                 final_score *= -1
-            send_response(f"midgame static evaluation: {'+' if str(midgame_score)[0] != '-' else ''}{midgame_score}")
-            send_response(f"endgame static evaluation: {'+' if str(endgame_score)[0] != '-' else ''}{endgame_score}")
-            send_response(f"final static evaluation: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
+            if verbose:
+                send_response(f"midgame static evaluation: {'+' if str(midgame_score)[0] != '-' else ''}{midgame_score}")
+                send_response(f"endgame static evaluation: {'+' if str(endgame_score)[0] != '-' else ''}{endgame_score}")
+                send_response(f"final static evaluation: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
+            else:
+                send_response(f"static evaluation: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
         elif tokens[0] == "board":
             board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             for row in board:
@@ -856,6 +886,11 @@ def main() -> None:
                 color = "b"
             elif color == "b":
                 color = "w"
+        elif tokens[0] == "verbose":
+            if tokens[1] == "on" and not verbose:
+                verbose = True
+            elif tokens[1] == "off" and verbose:
+                verbose = False
 
 
 if __name__ == "__main__":
