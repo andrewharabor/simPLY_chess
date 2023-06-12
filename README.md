@@ -39,13 +39,15 @@ A simple chess engine written in Python. This project was heavily inspired by [S
     - `position` - Set up the internal board position accordingly (at least one of the following parameters must be specified)
       - `startpos | fen <fen>` - Set up the starting position or the position specified by the FEN string
       - `moves <move1> <move2> ... <movei>` - Make the moves specified by the list of moves
-    - `go` - Calculate the best move for the current position (the following parameters are optional, `go depth 4 wtime 216000000 btime 216000000 winc 0 binc 0` is the default)
-      - `depth <depth>` - Limit the search to a specified depth
-      - `wtime <wtime> btime <btime> winc <winc> binc <binc>` - Limit the search through time control
+    - `go` - Calculate the best move for the current position (the following parameters are optional and mutually exclusive, `go depth 5 wtime 600000 btime 600000 winc 0 binc 0` is the default which limits both depth and time)
+      - `depth <depth>` - Limit the search to a specified depth but with unlimited time
+      - `wtime <wtime> btime <btime> winc <winc> binc <binc>` - Limit the search through time control but with unlimited depth
   - Custom commands:
     - `eval` - Return the static evaluation of the current position
     - `board` - Print the current board position in ASCII art and with the FEN string
     - `flip` - Flip the side to move
+    - `verbose` - Tell the engine to send extra information (the following parameter must be specified)
+      - `on | off` - Enable or disable verbosity
 
 ## Limitations
 
