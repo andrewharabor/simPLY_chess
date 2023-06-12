@@ -631,7 +631,7 @@ def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent
             display_move: str = algebraic_notation(best_move)
             display_score: float = (score / 100) * (-1 if color == "b" else 1)
             display_time: float = round(time() - start_time, 3)
-            send_response(f"depth: {max_depth}, move: {display_move}, score: {'+' if str(display_score)[0] != '-' else ''}{display_score}, nodes: {nodes}, q_nodes: {quiesce_nodes}, time: {display_time}, timeout: {timeout}")
+            send_response(f"depth: {max_depth}, move: {display_move}, score: {'+' if str(display_score)[0] != '-' else ''}{display_score}, nodes: {nodes}, q_nodes: {quiesce_nodes}, time: {display_time}{', timeout: True' if timeout else ''}")
         if timeout:
             best_move = previous_best_move
             break
