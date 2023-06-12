@@ -46,8 +46,6 @@ A simple chess engine written in Python. This project was heavily inspired by [S
     - `eval` - Return the static evaluation of the current position
     - `board` - Print the current board position in ASCII art and with the FEN string
     - `flip` - Flip the side to move
-    - `verbose` - Tell the engine to send extra information (the following parameter must be specified)
-      - `on | off` - Enable or disable verbosity
 
 ## Limitations
 
