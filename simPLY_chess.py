@@ -1,10 +1,11 @@
 
 import sys
 from itertools import count
+from time import time
 
 NAME: str = "simPLY_chess"
 AUTHOR: str = "andrewharabor"
-VERSION: str = "v0.1.0 2023"
+VERSION: str = "v0.2.0 2023"
 
 ##################################
 # CONSTANTS AND GLOBAL VARIABLES #
@@ -65,7 +66,7 @@ king_passant: int = INITIAL_KING_PASSANT
 color: str = INITIAL_COLOR
 
 # Transposition table, used to store previously calculated positions and keep track of the best move
-TRANSPOSITION_TABLE: dict[str, tuple[int, int, str, str]] = {}
+TRANSPOSITION_TABLE: dict[str, tuple[tuple[int, int, str, str], int, int]] = {}  # {position: (best_move, depth, score)}
 
 # Piece values and piece square tables for the middlegame and endgame
 # Used to evaluate the position in terms of material and piece placement
@@ -93,7 +94,7 @@ MIDGAME_PAWN_TABLE: list[int] = [
      -17,   16,    7,   26,   28,   15,   21,  -28,
      -33,   -2,   -6,   20,   26,    7,   12,  -30,
      -32,   -5,   -5,  -12,    4,    4,   40,  -15,
-     -43,   -1,  -24,  -23,  -33,   29,   46,  -27,
+     -43,   -1,  -24,  -33,  -23,   29,   46,  -27,
        0,    0,    0,    0,    0,    0,    0,    0,
 ]
 
@@ -320,7 +321,7 @@ def generate_moves(position: str, castling: list[bool], en_passant: int) -> list
                         move_list.append((end_square + EAST, end_square + WEST, piece_captured, ""))
                     if  start_square == H1 and position[end_square + WEST] == "K" and castling[1]:  # the piece is a rook on h1, and the king is on e1 with empty squares in between, and kingside castling is allowed
                         move_list.append((end_square + WEST, end_square + EAST, piece_captured, ""))
-
+    move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
     return move_list
 
 
@@ -509,17 +510,20 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
 # SEARCH LOGIC #
 ################
 
-def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
+def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, bool]:
     """Performs a fail-hard quiescent search (searches captures only until a quiet position is reached) with delta
-    pruning on the given position and returns the score found after the search."""
+    pruning. Returns the evaluation of the position and a timeout flag."""
+    global start_time, think_time
+    if time() - start_time > think_time:
+        return 0, True
+
     stand_pat: int = evaluate_position(position)
     if stand_pat >= beta:
-        return stand_pat
+        return stand_pat, False
 
     if alpha < stand_pat:
         alpha = stand_pat
     move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
-    move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
     for move in move_list:
         if move[2].islower():  # capture
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
@@ -527,38 +531,62 @@ def quiescent_search(alpha: int, beta: int, position: str, castling: list[bool],
             if not king_in_check(new_position[0], new_position[4]): # if the move doesn't result in our king being in check (legal move)
                 delta: int = 200
                 if stand_pat + ENDGAME_PIECE_VALUES[move[2].upper()] + ENDGAME_PIECE_VALUES[move[3]] + delta > alpha:  # delta pruning
-                    score: int = -quiescent_search(-beta, -alpha, *new_position)
+                    score: int
+                    timeout: bool
+                    score, timeout = quiesce(-beta, -alpha, *new_position)
+                    score *= -1
+                    if timeout:
+                        return 0, True
+
                     if score >= beta:
-                        return beta # fail-hard beta cutoff
+                        return beta, False # fail-hard beta cutoff
 
                     if score > alpha:
                         alpha = score
-    return alpha
+    return alpha, False
 
 
-def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, tuple[int, int, str, str]]:
+def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, tuple[int, int, str, str], bool]:
     """Performs a fail-hard negamax search with alpha-beta pruning on the given position, returning the best score and
-    move found after the search."""
-    if depth == 0:
-        return quiescent_search(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant), (0, 0, "", "")
+    move found after the search along with a timeout flag."""
+    global max_depth, start_time, think_time
+    if time() - start_time > think_time:
+        return 0, (0, 0, "", ""), True
 
-    killer_move: tuple[int, int, str, str] | None = TRANSPOSITION_TABLE.get(str(position))
-    if killer_move is not None:
-        return evaluate_position(position), killer_move
+    if depth == 0:
+        score: int
+        timeout: bool
+        score, timeout = quiesce(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        return score, (0, 0, "", ""), timeout
+
+    killer: tuple[tuple[int, int, str, str], int, int] | None = TRANSPOSITION_TABLE.get(str(position))  # killer move from transposition table
+    if killer is None:
+        killer = ((0, 0, "", ""), -1, 0)
+    if killer[1] >= depth or killer[2] >= CHECKMATE_LOWER:  # killer move found from higher depth or checkmate
+        return evaluate_position(position), killer[0], False
 
     else:
         scored_moves: list[tuple[int, tuple[int, int, str, str]]] = []
         move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
-        move_list.sort(key=lambda move: evaluate_move(move, position, en_passant), reverse=True)
+        for i in range(len(move_list)):  # PV move ordering: killer move from lower depth goes first
+            if move_list[i] == killer[0]:
+                move_list.insert(0, move_list.pop(i))
+                break
         best_move: tuple[int, int, str, str] = (0, 0, "", "")
         for move in move_list:
             new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
             new_position = rotate_position(*new_position)
             if not king_in_check(new_position[0], new_position[4]):  # if the move doesn't result in our king being in check (legal move)
-                score: int = -nega_max_search(depth - 1, -beta, -alpha, *new_position)[0]
+                score: int
+                timeout: bool
+                score, _, timeout = nega_max(depth - 1, -beta, -alpha, *new_position)
+                score *= -1
+                if timeout:
+                    return 0, (0, 0, "", ""), True
+
                 scored_moves.append((score, move))
                 if score >= beta:
-                    return beta, best_move  # fail-hard beta cutoff
+                    return beta, best_move, False  # fail-hard beta cutoff
 
                 if score > alpha:
                     alpha = score
@@ -566,15 +594,33 @@ def nega_max_search(depth: int, alpha: int, beta: int, position: str, castling: 
         if len(scored_moves) == 0:  # if there are no legal moves, it's either checkmate or stalemate.
             new_position = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
             if king_in_check(new_position[0], 0):
-                return -CHECKMATE_LOWER - depth, (0, 0, "", "")
+                return -CHECKMATE_LOWER + max_depth - depth, (0, 0, "", ""), False
 
             else:
-                return 0, (0, 0, "", "")
+                return 0, (0, 0, "", ""), False
 
         else:
-            if depth >= 2 and best_move != (0, 0, "", ""):
-                TRANSPOSITION_TABLE[str(position)] = best_move
-            return alpha, best_move
+            if best_move != (0, 0, "", ""):
+                TRANSPOSITION_TABLE[str(position)] = (best_move, depth, max(scored_moves)[0])
+            return alpha, best_move, False
+
+
+def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, int, str, str]:
+    """Wraps the negamax search function in an iterative deepening loop, utilizing the transposition table and PV move
+    ordering to improve search efficiency."""
+    best_move: tuple[int, int, str, str] = (0, 0, "", "")
+    previous_best_move: tuple[int, int, str, str] = (0, 0, "", "")
+    timeout: bool = False
+    global max_depth, start_time, think_time
+    for max_depth in range(1, depth + 1):
+        _, best_move, timeout = nega_max(max_depth, -CHECKMATE_UPPER, CHECKMATE_UPPER, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        if timeout:
+            best_move = previous_best_move
+            break
+        if best_move == (0, 0, "", ""):
+            break
+        previous_best_move = best_move
+    return best_move
 
 
 #####################
@@ -686,11 +732,12 @@ def send_response(response: str) -> None:
     sys.stdout.write(response + "\n")
     sys.stdout.flush()
 
+think_time: float
+start_time: float
 
 def main() -> None:
-    """The main UCI protocol loop responsible for parsing commands and sending responses. Sets up the board and
-    calls the search function when instructed."""
-    global position, castling, opponent_castling, en_passant, king_passant, color
+    """The main UCI loop responsible for parsing commands and sending responses."""
+    global position, castling, opponent_castling, en_passant, king_passant, color, think_time, start_time
     while True:
         command: str = sys.stdin.readline().strip()
         tokens: list[str] = command.split()
@@ -720,20 +767,21 @@ def main() -> None:
                 moves: list[str] = tokens[moves_index:]
                 ply: int = 0
                 for ply, move in enumerate(moves):
-                    start_square: int = parse_coordinates(move[:2])
-                    end_square: int = parse_coordinates(move[2:4])
-                    promotion_piece: str = move[4:].upper()
-                    if color == "b":  # if black to move, flip the coordinates
-                        start_square = 119 - start_square
-                        end_square = 119 - end_square
-                    if ply % 2 == 1:  # opponent's move so we flip the coordinates, then rotate the board before and after making the move
-                        start_square = 119 - start_square
-                        end_square = 119 - end_square
-                        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
-                        position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant)
-                        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
-                    else:  # our move so we just make it
-                        position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant)
+                    if move[1].isdigit() and move[3].isdigit():  # make sure the move is in long algebraic notation
+                        start_square: int = parse_coordinates(move[:2])
+                        end_square: int = parse_coordinates(move[2:4])
+                        promotion_piece: str = move[4:].upper()
+                        if color == "b":  # if black to move, flip the coordinates
+                            start_square = 119 - start_square
+                            end_square = 119 - end_square
+                        if ply % 2 == 1:  # opponent's move so we flip the coordinates, then rotate the board before and after making the move
+                            start_square = 119 - start_square
+                            end_square = 119 - end_square
+                            position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+                            position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant)
+                            position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+                        else:  # our move so we just make it
+                            position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant)
                 if ply % 2 == 0:  # rotate the board after the last move was made and switch the color
                     position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
                     if color == "w":
@@ -742,8 +790,40 @@ def main() -> None:
                         color = "w"
             king_passant = 0
         elif tokens[0] == "go":
-            # Depth 4 makes the engine a bit slow in the middle game but it should be fine since it doesn't spend too long during the opening and endgame
-            best_move: tuple[int, int, str, str] = nega_max_search(4, -CHECKMATE_UPPER, CHECKMATE_UPPER, position, castling[:], opponent_castling[:], en_passant, king_passant)[1]
+            depth: int = 4
+            white_time: int = 216000  # all times are in seconds
+            black_time: int = 216000  # time control is effectively unlimited if not specified
+            white_increment: int = 0
+            black_increment: int = 0
+            if "depth" in tokens:
+                depth_index: int = tokens.index("depth") + 1
+                if tokens[depth_index].isdigit():
+                    depth = int(tokens[depth_index])
+            if "wtime" in tokens:
+                white_time_index: int = tokens.index("wtime") + 1
+                if tokens[white_time_index].isdigit():
+                    white_time = int(tokens[white_time_index]) / 1000
+            if "btime" in tokens:
+                black_time_index: int = tokens.index("btime") + 1
+                if tokens[black_time_index].isdigit():
+                    black_time = int(tokens[black_time_index]) / 1000
+            if "winc" in tokens:
+                white_increment_index: int = tokens.index("winc") + 1
+                if tokens[white_increment_index].isdigit():
+                    white_increment = int(tokens[white_increment_index]) / 1000
+            if "binc" in tokens:
+                black_increment_index: int = tokens.index("binc") + 1
+                if tokens[black_increment_index].isdigit():
+                    black_increment = int(tokens[black_increment_index]) / 1000
+            if color == 'b':
+                white_time, black_time = black_time, white_time
+                white_increment, black_increment = black_increment, white_increment
+            if white_time <= 30:
+                think_time = 1  # leave room for up to 30 more moves if time is below 30 seconds
+            else:
+                think_time = white_time / 60 + white_increment
+            start_time = time()
+            best_move: tuple[int, int, str, str] = iteratively_deepen(depth, position, castling[:], opponent_castling[:], en_passant, king_passant)
             start_square: int = best_move[0]
             end_square: int = best_move[1]
             promotion_piece: str = best_move[3]
@@ -756,15 +836,26 @@ def main() -> None:
                 move_string: str = render_coordinates(start_square) + render_coordinates(end_square) + promotion_piece.lower()
             send_response(f"bestmove {move_string}")
         elif tokens[0] == "eval":
-            score: float = evaluate_position(position) / 100
+            midgame_score: float = evaluate_position_midgame(position) / 100
+            endgame_score: float = evaluate_position_endgame(position) / 100
+            final_score: float = evaluate_position(position) / 100
             if color == "b":
-                score *= -1
-            send_response(f"static evaluation: {'+' if str(score)[0] != '-' else ''}{score}")
+                midgame_score *= -1
+                endgame_score *= -1
+                final_score *= -1
+            send_response(f"midgame static evaluation: {'+' if str(midgame_score)[0] != '-' else ''}{midgame_score}")
+            send_response(f"endgame static evaluation: {'+' if str(endgame_score)[0] != '-' else ''}{endgame_score}")
+            send_response(f"final static evaluation: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
         elif tokens[0] == "board":
             board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             for row in board:
                 send_response(row)
             send_response(f"FEN: {generate_fen(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
+        elif tokens[0] == "flip":
+            if color == "w":
+                color = "b"
+            elif color == "b":
+                color = "w"
 
 
 if __name__ == "__main__":
