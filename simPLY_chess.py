@@ -850,8 +850,10 @@ def main() -> None:
             if color == 'b':
                 white_time, black_time = black_time, white_time
                 white_increment, black_increment = black_increment, white_increment
-            if white_time <= 30:
-                time_limit = 1  # leave room for up to 30 more moves if time is below 30 seconds
+            if white_time <= 5:
+                time_limit = 0.1
+            elif white_time <= 30:
+                time_limit = 1
             else:
                 time_limit = white_time / 60 + white_increment
             start_time = time()
@@ -865,9 +867,9 @@ def main() -> None:
                 midgame_score *= -1
                 endgame_score *= -1
                 final_score *= -1
-            send_response(f"midgame static evaluation: {'+' if str(midgame_score)[0] != '-' else ''}{midgame_score}")
-            send_response(f"endgame static evaluation: {'+' if str(endgame_score)[0] != '-' else ''}{endgame_score}")
-            send_response(f"final static evaluation: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
+            send_response(f"midgame static eval: {'+' if str(midgame_score)[0] != '-' else ''}{midgame_score}")
+            send_response(f"endgame static eval: {'+' if str(endgame_score)[0] != '-' else ''}{endgame_score}")
+            send_response(f"final static eval: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
         elif tokens[0] == "board":
             board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             for row in board:
