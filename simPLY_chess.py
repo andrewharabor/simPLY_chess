@@ -292,8 +292,6 @@ nodes: int = 0
 quiesce_nodes: int = 0
 time_limit: float = 0
 start_time: float = 0
-verbose: bool = False
-
 
 
 ###############
@@ -341,8 +339,7 @@ def make_move(move: tuple[int, int, str, str], position: str, castling: list[boo
     end_square: int = move[1]
     promotion_piece: str = move[3]
     piece_moved: str = list_position[start_square]
-    king_passant = 0
-    en_passant = 0
+    king_passant: int = 0
     list_position[start_square] = "."
     list_position[end_square] = piece_moved
     if start_square == A1:  # queenside rook moved
@@ -364,12 +361,14 @@ def make_move(move: tuple[int, int, str, str], position: str, castling: list[boo
             king_passant = (start_square + end_square) // 2
             list_position[H1], list_position[king_passant] = list_position[king_passant], list_position[H1]
     elif piece_moved == "P":
-        if end_square + SOUTH == en_passant:  # en passant capture
+        if end_square == en_passant:  # en passant capture
             list_position[end_square + SOUTH] = "."
         if A8 <= end_square <= H8:  # pawn promotion
             list_position[end_square] = promotion_piece
         if end_square - start_square == NORTH + NORTH:  # double pawn push
             en_passant = end_square + SOUTH
+        else:
+            en_passant: int = 0
     position = "".join(list_position)
     return position, castling, opponent_castling, en_passant, king_passant
 
@@ -619,7 +618,7 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
 def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[int, int, str, str]:
     """Wraps the negamax search function in an iterative deepening loop, utilizing the transposition table and PV move
     ordering to improve search efficiency."""
-    global max_depth, nodes, quiesce_nodes, start_time, time_limit, verbose
+    global max_depth, nodes, quiesce_nodes, start_time, time_limit
     score: int
     best_move: tuple[int, int, str, str] = (0, 0, "", "")
     previous_best_move: tuple[int, int, str, str] = (0, 0, "", "")
@@ -627,14 +626,10 @@ def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent
     for max_depth in range(1, depth + 1):
         nodes, quiesce_nodes = 0, 0
         score, best_move, timeout = nega_max(max_depth, -CHECKMATE_UPPER, CHECKMATE_UPPER, position, castling[:], opponent_castling[:], en_passant, king_passant)
-        if verbose:
-            display_move: str = algebraic_notation(best_move)
-            display_score: float = (score / 100) * (-1 if color == "b" else 1)
-            display_time: float = round(time() - start_time, 3)
-            send_response(f"depth: {max_depth}, move: {display_move}, score: {'+' if str(display_score)[0] != '-' else ''}{display_score}, nodes: {nodes}, q_nodes: {quiesce_nodes}, time: {display_time}{', timeout: True' if timeout else ''}")
         if timeout:
             best_move = previous_best_move
             break
+        send_response(f"info depth {max_depth} move {algebraic_notation(best_move)} score cp {score * (-1 if color == 'b' else 1)} nodes {nodes} q_nodes {quiesce_nodes} time {round(time() - start_time, 3)}s")
         if best_move == (0, 0, "", ""):
             break
         previous_best_move = best_move
@@ -768,7 +763,7 @@ def send_response(response: str) -> None:
 
 def main() -> None:
     """The main UCI loop responsible for parsing commands and sending responses."""
-    global position, castling, opponent_castling, en_passant, king_passant, color, time_limit, start_time, verbose
+    global position, castling, opponent_castling, en_passant, king_passant, color, time_limit, start_time
     while True:
         command: str = sys.stdin.readline().strip()
         tokens: list[str] = command.split()
@@ -870,12 +865,9 @@ def main() -> None:
                 midgame_score *= -1
                 endgame_score *= -1
                 final_score *= -1
-            if verbose:
-                send_response(f"midgame static evaluation: {'+' if str(midgame_score)[0] != '-' else ''}{midgame_score}")
-                send_response(f"endgame static evaluation: {'+' if str(endgame_score)[0] != '-' else ''}{endgame_score}")
-                send_response(f"final static evaluation: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
-            else:
-                send_response(f"static evaluation: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
+            send_response(f"midgame static evaluation: {'+' if str(midgame_score)[0] != '-' else ''}{midgame_score}")
+            send_response(f"endgame static evaluation: {'+' if str(endgame_score)[0] != '-' else ''}{endgame_score}")
+            send_response(f"final static evaluation: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
         elif tokens[0] == "board":
             board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             for row in board:
@@ -886,11 +878,6 @@ def main() -> None:
                 color = "b"
             elif color == "b":
                 color = "w"
-        elif tokens[0] == "verbose":
-            if tokens[1] == "on" and not verbose:
-                verbose = True
-            elif tokens[1] == "off" and verbose:
-                verbose = False
 
 
 if __name__ == "__main__":
