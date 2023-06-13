@@ -514,6 +514,19 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
     return interpolate_evaluations(midgame_score, endgame_score, phase)
 
 
+def principal_variation(position: str) -> list[tuple[int, int, str, str]]:
+    """Uses the transposition table to find the principal variation for the given position as a list of moves."""
+    result: tuple[int, int, str, str] | None = TRANSPOSITION_TABLE.get(position)
+    if result is None:
+        return []
+
+    else:
+        best_move: tuple[int, int, str, str] = result[0]
+        new_position: tuple[str, list[bool], list[bool], int, int] = make_move(best_move, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        new_position = rotate_position(*new_position)
+        return [best_move] + principal_variation(new_position[0])
+
+
 ################
 # SEARCH LOGIC #
 ################
@@ -562,20 +575,20 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
     if time() - start_time > time_limit:
         return 0, (0, 0, "", ""), True
 
-    nodes += 1
     if depth == 0:
         score: int
         timeout: bool
         score, timeout = quiesce(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant)
         return score, (0, 0, "", ""), timeout
 
-    killer: tuple[tuple[int, int, str, str], int, int] | None = TRANSPOSITION_TABLE.get(str(position))  # killer move from transposition table
+    killer: tuple[tuple[int, int, str, str], int, int] | None = TRANSPOSITION_TABLE.get(position)  # killer move from transposition table
     if killer is None:
         killer = ((0, 0, "", ""), -1, 0)
     if killer[1] >= depth or killer[2] >= CHECKMATE_LOWER:  # killer move found from higher depth or checkmate
         return evaluate_position(position), killer[0], False
 
     else:
+        nodes += 1
         scored_moves: list[tuple[int, tuple[int, int, str, str]]] = []
         move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
         for i in range(len(move_list)):  # PV move ordering: killer move from lower depth goes first
@@ -629,7 +642,13 @@ def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent
         if timeout:
             best_move = previous_best_move
             break
-        send_response(f"info depth {max_depth} move {algebraic_notation(best_move)} score cp {score * (-1 if color == 'b' else 1)} nodes {nodes} q_nodes {quiesce_nodes} time {round(time() - start_time, 3)}s")
+        pv_string: str = ""
+        for i, move in enumerate(principal_variation(position)):
+            if i % 2 == 0:
+                pv_string += algebraic_notation(move) + " "
+            else:
+                pv_string += algebraic_notation((119 - move[0], 119 - move[1], move[2], move[3])) + " "  # color doesn't get updated so flip every opponent's move
+        send_response(f"info depth {max_depth} score cp {score * (-1 if color == 'b' else 1)} nodes {nodes + quiesce_nodes} time {int(round(time() - start_time, 3) * 1000)} pv {pv_string.rstrip()}")
         if best_move == (0, 0, "", ""):
             break
         previous_best_move = best_move
@@ -829,7 +848,7 @@ def main() -> None:
                 black_time = 216000
                 white_increment = 0
                 black_increment = 0
-            else:
+            elif "wtime" in tokens or "btime" in tokens or "winc" in tokens or "binc" in tokens:
                 depth = 30  # if time is specified, unlimited depth is assumed
                 if "wtime" in tokens:
                     white_time_index: int = tokens.index("wtime") + 1
@@ -876,6 +895,7 @@ def main() -> None:
                 send_response(row)
             send_response(f"FEN: {generate_fen(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
         elif tokens[0] == "flip":
+            position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
             if color == "w":
                 color = "b"
             elif color == "b":
