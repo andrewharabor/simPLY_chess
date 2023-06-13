@@ -543,7 +543,7 @@ def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent
                     score: int
                     timeout: bool
                     score, timeout = quiesce(-beta, -alpha, *new_position)
-                    score *= -1
+                    score *= -1  # negate score since we're looking at the opponent's position
                     if timeout:
                         return 0, True
 
@@ -590,7 +590,7 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
                 score: int
                 timeout: bool
                 score, _, timeout = nega_max(depth - 1, -beta, -alpha, *new_position)
-                score *= -1
+                score *= -1  # negate score since we're looking at the opponent's position
                 if timeout:
                     return 0, (0, 0, "", ""), True
 
