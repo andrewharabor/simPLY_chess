@@ -279,14 +279,14 @@ CHECKMATE_UPPER: int = MIDGAME_KING_VALUE + 10 * MIDGAME_QUEEN_VALUE
 CHECKMATE_LOWER: int = MIDGAME_KING_VALUE - 10 * MIDGAME_QUEEN_VALUE
 
 # Game phase constants
-PAWN_PHASE: int = 0
 KNIGHT_PHASE: int = 1
 BISHOP_PHASE: int = 1
 ROOK_PHASE: int = 2
 QUEEN_PHASE: int = 4
-TOTAL_PHASE: int = 16 * PAWN_PHASE + 4 * KNIGHT_PHASE + 4 * BISHOP_PHASE + 4 * ROOK_PHASE + 2 * QUEEN_PHASE
+TOTAL_PHASE: int = 4 * KNIGHT_PHASE + 4 * BISHOP_PHASE + 4 * ROOK_PHASE + 2 * QUEEN_PHASE
 
-# Main loop constants
+# Main loop variables
+global max_depth, nodes, quiesce_nodes, time_limit, start_time
 max_depth: int = 0
 nodes: int = 0
 quiesce_nodes: int = 0
@@ -423,7 +423,6 @@ def king_in_check(position: str, king_passant: int) -> bool:
 def game_phase(position: str) -> int:
     """Evaluates the current game phase though piece counts."""
     phase: int = TOTAL_PHASE
-    phase -= (position.count("P") + position.count("p")) * PAWN_PHASE
     phase -= (position.count("N") + position.count("n")) * KNIGHT_PHASE
     phase -= (position.count("B") + position.count("b")) * BISHOP_PHASE
     phase -= (position.count("R") + position.count("r")) * ROOK_PHASE
@@ -869,12 +868,12 @@ def main() -> None:
             if color == 'b':
                 white_time, black_time = black_time, white_time
                 white_increment, black_increment = black_increment, white_increment
-            if white_time <= 5:
-                time_limit = 0.1
-            elif white_time <= 30:
+            if white_time <= 10:
+                time_limit = 0.5
+            elif white_time <= 60:
                 time_limit = 1
             else:
-                time_limit = white_time / 60 + white_increment
+                time_limit = white_time / 40 + white_increment
             start_time = time()
             best_move: tuple[int, int, str, str] = iteratively_deepen(depth, position, castling[:], opponent_castling[:], en_passant, king_passant)
             send_response(f"bestmove {algebraic_notation(best_move)}")
