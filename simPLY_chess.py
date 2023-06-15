@@ -515,7 +515,7 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
 
 def principal_variation(position: str) -> list[tuple[int, int, str, str]]:
     """Uses the transposition table to find the principal variation for the given position as a list of moves."""
-    result: tuple[int, int, str, str] | None = TRANSPOSITION_TABLE.get(position)
+    result: tuple[tuple[int, int, str, str], int, int] | None = TRANSPOSITION_TABLE.get(position)
     if result is None:
         return []
 
