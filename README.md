@@ -32,16 +32,19 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 - Communicates through standard [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) protocol to allow for easy integration into any [GUI](https://www.chessprogramming.org/GUI)
   - Standard commands:
-    - `uci` - Initiates UCI protocol
-    - `isready` - Synchronizes and initializes engine
-    - `quit` - Terminates the engine
+    - `uci` - Initiate UCI protocol
+    - `isready` - Synchronize and initialize engine
+    - `quit` - Terminate the engine
     - `ucinewgame` - Notifiy engine that next search will be from a different game (and reset the transposition table)
     - `position` - Set up the internal board position accordingly (at least one of the following parameters is required)
       - `startpos | fen <fen>` - Set up the starting position or the position specified by the FEN string
       - `moves <move1> <move2> ... <movei>` - Make the moves specified by the list of moves
-    - `go` - Calculate the best move for the current position (the following parameter is required, `go depth 5 wtime 600000 btime 600000 winc 0 binc 0` is the default which limits both depth and time)
-      - `depth <depth> | wtime <wtime> btime <btime> winc <winc> binc <binc>` - Limit the search to a certain depth with unlimited time or limit the search through time control with unlimited depth
-  - Custom commands:
+    - `go` - Calculate the best move for the current position (the following parameters are optional, `go depth 5 movetime 10000` is the default)
+      - `depth <depth>` - Limit the search to a certain depth
+      - `movetime <movetime>` - Limit the search to a certain time (in milliseconds)
+      - `wtime <wtime> btime <btime> winc <winc> binc <binc>` - Limit the search through time control (in milliseconds)
+      - `infinite` - Search without a time or depth limit, note that the engine is unable to respond to `stop` commands in this mode (even though it should be able to) and will NEVER stop searching
+  - Custom commands (inspired by Stockfish):
     - `eval` - Return the static evaluation of the current position
     - `board` - Print the current board position in ASCII art and with the FEN string
     - `flip` - Flip the side to move
@@ -50,11 +53,11 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 - Relies on a [GUI](https://www.chessprogramming.org/GUI) for features like time control and stalemate/checkmate detection
 
-- Written in Python meaning that it isn't too strong since it can't search past a depth of 4-ply in a reasonable amount of time (for most positions)
+- Written in Python meaning that it can't search past a depth of 4-ply in a reasonable amount of time for most positions, especially in the middlegame
 
 - Does not take 3-fold repetition or the fifty-move-rule into account meaning that those rules can be exploited when the engine has a winning position
 
-- Does not have an [opening book](https://www.chessprogramming.org/Opening_Book) meaning that it has almost no variation in the opening stage of the game
+- Does not have an [opening book](https://www.chessprogramming.org/Opening_Book) meaning that it has no variation in the opening stage of the game and may not always play according to modern theory
 
 - Lacks various other [search](https://www.chessprogramming.org/Search) techniques that could improve its speed and strength
 
