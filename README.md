@@ -28,7 +28,7 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 - [Tapered evaluation](https://www.chessprogramming.org/Tapered_Eval) to interpolate between the evaluation of the position using middlegame and endgame criteria
 
-- Variable depth to accomodate time control and user accessibility over search speed
+- Variable depth to accomodate time control and user accessibility over search time
 
 - Communicates through standard [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) protocol to allow for easy integration into any [GUI](https://www.chessprogramming.org/GUI)
   - Standard commands:
