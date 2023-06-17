@@ -8,7 +8,7 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
  I initially planned to use the official [API](https://github.com/lichess-bot-devs/lichess-bot) to put the engine on [Lichess](https://lichess.org/) but until then, just import the engine in a [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) [GUI](https://www.chessprogramming.org/GUI) if you want to play against it.
 
- ![[Date "2023.06.12"] [White "simPLY_chess"] [Black "Andrew Harabor"] [Result "0-1"] [WhiteElo "1450"] [BlackElo "1200"] [TimeControl "600+0"] [Opening "Queen's Pawn Game: Symmetrical Variation"] 1. d4 d5 2. Nf3 Nf6 3. Be3 Nc6 4. Nc3 Bf5 5. Ne5 e6 6. Nxc6 bxc6 7. h3 Rb8 8. Rb1 Bd6 9. f3 O-O 10. Kf2 Re8 11. g4 Bg6 12. g5 Nh5 13. Rg1 e5 14. dxe5 Bxe5 15. Bc5 d4 16. Na4 Bf4 17. Rg4 Be3+ 18. Ke1 f5 19. Rxd4 Bxd4 20. Qxd4 Qxd4 21. Bxd4 Rb4 22. Bxg7 Kxg7 23. Nc5 Ng3 24. Na6 Ra4 25. Nxc7 Re7 26. Na8 Rxa2 27. Kf2 Nxf1 28. Kxf1 f4 29. e4 fxe3 30. b4 Bxc2 31. Rc1 Bd3+ 32. Kg1 e2 33. Re1 Rb2 34. Kf2 Rb1 35. Rxb1 Bxb1 36. Ke1 Bd3 37. Nb6 axb6 38. h4 Kg6 39. h5+ Kxh5 40. g6 hxg6 41. Kd2 e1=Q+ 42. Kxd3 Qe2+ 43. Kd4 Qe3+ 44. Kc4 b5# 0-1](game.gif)
+[simPLY_chess-Stockfish.webm](https://github.com/andrewharabor/simPLY_chess/assets/120438036/5096dce1-5505-49d3-bd66-e370a3bc88d7)
 
 ## Features
 
