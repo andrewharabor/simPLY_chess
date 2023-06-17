@@ -504,16 +504,16 @@ def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: in
     return interpolate_evaluations(midgame_score, endgame_score, phase)
 
 
-def principal_variation(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> list[tuple[int, int, str, str]]:
+def principal_variation(length: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> list[tuple[int, int, str, str]]:
     """Uses the transposition table to find the principal variation for the given position as a list of moves."""
     result: tuple[tuple[int, int, str, str], int, int] | None = TRANSPOSITION_TABLE.get(position)
-    if result is None:
+    if result is None or length <= 0:
         return []
 
     best_move: tuple[int, int, str, str] = result[0]
     new_position: tuple[str, list[bool], list[bool], int, int] = make_move(best_move, position, castling[:], opponent_castling[:], en_passant, king_passant)
     new_position = rotate_position(*new_position)
-    return [best_move] + principal_variation(*new_position)
+    return [best_move] + principal_variation(length - 1, *new_position)
 
 
 ################
@@ -629,7 +629,7 @@ def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent
             best_move = previous_best_move
             break
         pv_string: str = ""
-        for i, move in enumerate(principal_variation(position, castling[:], opponent_castling[:], en_passant, king_passant)):
+        for i, move in enumerate(principal_variation(max_depth, position, castling[:], opponent_castling[:], en_passant, king_passant)):
             if i % 2 == 0:
                 pv_string += algebraic_notation(move, color) + " "
             else:
