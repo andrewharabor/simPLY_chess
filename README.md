@@ -30,22 +30,22 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 - Communicates through standard [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) protocol to allow for easy integration into any [GUI](https://www.chessprogramming.org/GUI)
   - Standard commands:
-    - `uci` - Initiate UCI protocol
-    - `isready` - Synchronize and initialize engine
-    - `quit` - Terminate the engine
-    - `ucinewgame` - Notifiy engine that next search will be from a different game (and reset the transposition table)
-    - `position` - Set up the internal board position accordingly (at least one of the following parameters is required)
-      - `startpos | fen <fen>` - Set up the starting position or the position specified by the FEN string
-      - `moves <move1> <move2> ... <movei>` - Make the moves specified by the list of moves
-    - `go` - Calculate the best move for the current position (the following parameters are optional, `go depth 5 movetime 10000` is the default)
-      - `depth <depth>` - Limit the search to a certain depth
-      - `movetime <movetime>` - Limit the search to a certain time (in milliseconds)
-      - `wtime <wtime> btime <btime> winc <winc> binc <binc>` - Limit the search through time control (in milliseconds)
-      - `infinite` - Search without a time or depth limit, note that the engine is unable to respond to `stop` commands in this mode (even though it should be able to) and will NEVER stop searching
-  - Custom commands (inspired by Stockfish):
-    - `eval` - Return the static evaluation of the current position
-    - `board` - Print the current board position in ASCII art and with the FEN string
-    - `flip` - Flip the side to move
+    - `uci`: Tell engine to use the uci (universal chess interface), this will be sent once as a first command after program boot to tell the engine to switch to uci mode.
+    - `isready`: This is used to synchronize the engine with the GUI. When the GUI has sent a command or multiple commands that can take some time to complete, this command can be used to wait for the engine to be ready again or to ping the engine to find out if it is still alive.
+    - `ucinewgame`: This is sent to the engine when the next search (started with `position` and `go`) will be from a different game. This can be a new game the engine should play or a new game it should analyze but also the next position from a testsuite with positions only.
+    - `position [fen <fenstring> | startpos ]  moves <move1> .... <movei>`: Set up the position described in fenstring on the internal board and play the moves on the internal chess board. If the game was played from the start position, the string `startpos` should be sent
+    - `go`: Start calculating on the current position set up with the `position` command. There are a number of commands that can follow this command, all will be sent in the same string. If just `go` is sent, `go depth 5 movetime 10000` is run by default.
+      - `wtime <x>`: White has x milliseconds left on the clock.
+      - `btime <x>`: Black has x milliseconds left on the clock.
+      - `winc <x>`: White increment per move in milliseconds if x > 0.
+      - `binc <x>`: Black increment per move in milliseconds if x > 0.
+      - `depth <x>`: Search x plies only.
+      - `movetime <x>`: Search exactly x milliseconds.
+    - `quit`: Quit the program as soon as possible.
+  - Custom commands:
+    - `board`: Display the current position, with ASCII art and FEN.
+    - `eval`: Display the static evaluation of the current position.
+    - `flip`: Flips the side to move.
 
 ## Limitations
 
