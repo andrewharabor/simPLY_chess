@@ -870,11 +870,7 @@ def main() -> None:
                     time_limit = 1
                 else:
                     time_limit = white_time / 40 + white_increment
-            if len(tokens) >= 2 and tokens[1] == "infinite":
-                depth = 30
-                time_limit = 86400
             # Technically, we have to be able to recieve the `stop` command at any time but we'd need concurrency to do so
-            # This means that the only way to exit `go infinite` is a KeyboardInterrupt (Ctrl+C)
             best_move: tuple[int, int, str, str] = iteratively_deepen(depth, position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             send_response(f"bestmove {algebraic_notation(best_move, color)}")
         elif tokens[0] == "eval":
