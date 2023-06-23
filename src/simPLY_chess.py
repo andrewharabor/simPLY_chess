@@ -500,9 +500,10 @@ DECODED_PROMOTION_PIECES: dict[int, str] = {
     4: "Q",
 }
 
-# default.bin is Komodo3's opening book by Salvo Spitaleri and is the most extensive (340,000+ entries) and accurate of the three books currently in the opening_books folder
-# alternative.bin is by Flavio Martin and is still a strong book for analysis and play
-# basic.bin was released by Richard Pijl and is claimed to be nearly identical to the book used in the 2018 WCCC (though the lines are fairly limited with evenly distributed weights)
+# default.bin is Komodo3's opening book by Salvo Spitaleri and is an extensive and accurate book for strong positional play
+# alternative.bin is by Flavio Martin and is a great book for analysis and play
+# basic.bin was released by Richard Pijl and is claimed to be nearly identical to the book used in the 2018 WCCC though it isn't too strong
+# database.bin contains nearly 1 million entries and has the most extensive opening data yet every move is weighted equally meaning it is better as a database than for play
 BOOK_PATH: str = "src/opening_books/default.bin"
 
 # Load opening book data
