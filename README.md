@@ -12,19 +12,19 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 ## Features
 
-- [Piece material values](https://www.chessprogramming.org/Point_Value) for the core of the [evaluation](https://www.chessprogramming.org/Evaluation) function
-
-- [Piece square tables](https://www.chessprogramming.org/Piece-Square_Tables) to give the engine positional "knowledge"
-
-- Basic [transposition table](https://www.chessprogramming.org/Transposition_Table) (without hashing) to improve search times and limit redundant computation by storing the results of previous searches
-
 - [NegaMax search](https://www.chessprogramming.org/Negamax) algorithm with [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) to greatly reduce the number of nodes searched by pruning branches that are either too good or too bad
 
 - [Quiescence search](https://www.chessprogramming.org/Quiescence_Search) to avoid the [horizon effect](https://www.chessprogramming.org/Horizon_Effect) along with [delta pruning](https://www.chessprogramming.org/Delta_Pruning) to further reduce the number of nodes searched
 
 - [Iterative deepening](https://www.chessprogramming.org/Iterative_Deepening) to improve the efficiency of the search by utilizing the [transposition table](https://www.chessprogramming.org/Transposition_Table) and the [principal variation](https://www.chessprogramming.org/Principal_Variation) from previous searches
 
+- [Piece square tables](https://www.chessprogramming.org/Piece-Square_Tables) to give the engine positional "knowledge"
+
 - [Tapered evaluation](https://www.chessprogramming.org/Tapered_Eval) to interpolate between the evaluation of the position using middlegame and endgame criteria
+
+- [Transposition table](https://www.chessprogramming.org/Transposition_Table) with [zobrist hashing](https://www.chessprogramming.org/Zobrist_Hashing) to improve search times and limit redundant computation by storing the results of previous searches
+
+- Built-in [PolyGlot](https://www.chessprogramming.org/Polyglot) [opening book](https://www.chessprogramming.org/Opening_Book) reader to improve the engine's play in the opening
 
 - Variable depth to accomodate time control and user accessibility over search time
 
@@ -55,10 +55,8 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 - Does not take 3-fold repetition or the fifty-move-rule into account meaning that those rules can be exploited when the engine has a winning position
 
-- Does not have an [opening book](https://www.chessprogramming.org/Opening_Book) meaning that it has no variation in the opening stage of the game and may not always play according to modern theory
-
 - Lacks various other [search](https://www.chessprogramming.org/Search) techniques that could improve its speed and strength
 
 ## My Thoughts
 
-I decided to program this engine because I enjoy playing chess and I figured it would be a challenging project. Despite all of its limitations, the engine actually plays well enough to draw with and even beat me occasionally. There are many ways I could improve the playing strength and speed and while I will likely come back and implement some of them, my original goal with this project has been fulfilled. Overall, I'm happy with the result and I really enjoyed the process.
+I decided to program this engine because I enjoy playing chess and I figured it would be a challenging project. Despite all of its limitations, the engine plays better than I initially though it would. There are many ways I could improve the playing strength and speed and while I will likely come back and implement some of them, my original goal with this project has been fulfilled. Overall, I'm happy with the result and I really enjoyed the process.
