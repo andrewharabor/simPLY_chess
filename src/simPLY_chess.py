@@ -55,7 +55,7 @@ INITIAL_POSITION: str = (
 )
 INITIAL_CASTLING: list[bool] = [True, True]  # [queenside, kingside]
 INITIAL_OPPONENT_CASTLING: list[bool] = [True, True]  # [queenside, kingside]
-INITIAL_EN_PASSANT: int = 0  # square where en passant is possible for us
+INITIAL_EN_PASSANT: int = 0  # square where en passant is possible for the current player
 INITIAL_KING_PASSANT: int = 0  # square the king "passes through" when castling (the square the rook is moved to), used to detect castling through check
 INITIAL_COLOR: str = "w"  # the current player's color
 
@@ -64,7 +64,7 @@ TRANSPOSITION_TABLE: dict[int, tuple[tuple[int, int, str, str], int, int]] = {} 
 
 # Piece values and piece square tables for the middlegame and endgame
 # Used to evaluate the position in terms of material and piece placement
-MIDGAME_PAWN_VALUE: int = 100  # all values are centralized around centipawns
+MIDGAME_PAWN_VALUE: int = 100  # all values are in centipawns
 MIDGAME_KNIGHT_VALUE: int = 411
 MIDGAME_BISHOP_VALUE: int = 445
 MIDGAME_ROOK_VALUE: int = 582
@@ -270,7 +270,7 @@ for piece in "PNBRQK":
 CHECKMATE_UPPER: int = ENDGAME_KING_VALUE + 10 * ENDGAME_QUEEN_VALUE
 CHECKMATE_LOWER: int = ENDGAME_KING_VALUE - 10 * ENDGAME_QUEEN_VALUE
 
-# Game phase constants
+# Game phase constants to interpolate between midgame and endgame scores
 KNIGHT_PHASE: int = 1
 BISHOP_PHASE: int = 1
 ROOK_PHASE: int = 2
