@@ -12,23 +12,13 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
 ## Features
 
-- [NegaMax search](https://www.chessprogramming.org/Negamax) algorithm with [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) to greatly reduce the number of nodes searched by pruning branches that are either too good or too bad
+- [NegaMax](https://www.chessprogramming.org/Negamax) search with [alpha-beta pruning](https://www.chessprogramming.org/Alpha-Beta) and [quiescence search](https://www.chessprogramming.org/Quiescence_Search) within an [iterative deepening](https://www.chessprogramming.org/Iterative_Deepening) loop
 
-- [Quiescence search](https://www.chessprogramming.org/Quiescence_Search) to avoid the [horizon effect](https://www.chessprogramming.org/Horizon_Effect) along with [delta pruning](https://www.chessprogramming.org/Delta_Pruning) to further reduce the number of nodes searched
+- [Piece square tables](https://www.chessprogramming.org/Piece-Square_Tables), [king tropism](https://www.chessprogramming.org/King_Safety#King_Tropism), [mop-up evaluation](https://www.chessprogramming.org/Mop-up_Evaluation), and [tapered evaluation](https://www.chessprogramming.org/Tapered_Eval)
 
-- [Iterative deepening](https://www.chessprogramming.org/Iterative_Deepening) to improve the efficiency of the search by utilizing the [transposition table](https://www.chessprogramming.org/Transposition_Table) and the [principal variation](https://www.chessprogramming.org/Principal_Variation) from previous searches
+- [Transposition table](https://www.chessprogramming.org/Transposition_Table) with [Zobrist hashing](https://www.chessprogramming.org/Zobrist_Hashing) along with  built-in [PolyGlot](https://www.chessprogramming.org/Polyglot) [opening book](https://www.chessprogramming.org/Opening_Book) reader
 
-- [Piece square tables](https://www.chessprogramming.org/Piece-Square_Tables) to give the engine positional "knowledge"
-
-- [Tapered evaluation](https://www.chessprogramming.org/Tapered_Eval) to interpolate between the evaluation of the position using middlegame and endgame criteria
-
-- [Transposition table](https://www.chessprogramming.org/Transposition_Table) with [zobrist hashing](https://www.chessprogramming.org/Zobrist_Hashing) to improve search times and limit redundant computation by storing the results of previous searches
-
-- Built-in [PolyGlot](https://www.chessprogramming.org/Polyglot) [opening book](https://www.chessprogramming.org/Opening_Book) reader to improve the engine's play in the opening
-
-- Variable depth to accomodate time control and user accessibility over search time
-
-- Communicates through standard [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) protocol to allow for easy integration into any [GUI](https://www.chessprogramming.org/GUI)
+- Communicates through standard [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) protocol
   - Standard commands:
     - `uci`: Tell engine to use the uci (universal chess interface), this will be sent once as a first command after program boot to tell the engine to switch to uci mode.
     - `isready`: This is used to synchronize the engine with the GUI. When the GUI has sent a command or multiple commands that can take some time to complete, this command can be used to wait for the engine to be ready again or to ping the engine to find out if it is still alive.
