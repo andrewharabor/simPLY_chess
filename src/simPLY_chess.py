@@ -80,14 +80,8 @@ MIDGAME_PIECE_VALUES: dict[str, int] = {
     "K": MIDGAME_KING_VALUE
 }
 
-MIDGAME_TROPISM_VALUES: dict[str, int] = {
-    "P": MIDGAME_PAWN_VALUE // 15,
-    "N": MIDGAME_KNIGHT_VALUE // 15,
-    "B": MIDGAME_BISHOP_VALUE // 15,
-    "R": MIDGAME_ROOK_VALUE // 15,
-    "Q": MIDGAME_QUEEN_VALUE // 15,
-    "K": MIDGAME_KING_VALUE // 15
-}
+MIDGAME_TROPISM_VALUES: dict[str, int] = {piece: value // 15 for piece, value in MIDGAME_PIECE_VALUES.items()}
+
 
 MIDGAME_PAWN_TABLE: list[int] = [
        0,    0,    0,    0,    0,    0,    0,    0,
@@ -190,14 +184,7 @@ ENDGAME_PIECE_VALUES: dict[str, int] = {
     "K": ENDGAME_KING_VALUE,
 }
 
-ENDGAME_TROPISM_VALUES: dict[str, int] = {
-    "P": ENDGAME_PAWN_VALUE // 7,
-    "N": ENDGAME_KNIGHT_VALUE // 7,
-    "B": ENDGAME_BISHOP_VALUE // 7,
-    "R": ENDGAME_ROOK_VALUE // 7,
-    "Q": ENDGAME_QUEEN_VALUE // 7,
-    "K": ENDGAME_KING_VALUE // 7,
-}
+ENDGAME_TROPISM_VALUES: dict[str, int] = {piece: value // 7 for piece, value in ENDGAME_PIECE_VALUES.items()}
 
 ENDGAME_PAWN_TABLE: list[int] = [
        0,    0,    0,    0,    0,    0,    0,    0,
@@ -672,6 +659,7 @@ def manhattan_distance(square1: int, square2: int) -> int:
     """Calculates the Manhattan distance between two squares."""
     return abs(square1 % 10 - square2 % 10) + abs(square1 // 10 - square2 // 10)
 
+
 def game_phase(position: str) -> int:
     """Evaluates the current game phase though piece counts."""
     phase: int = TOTAL_PHASE
@@ -682,103 +670,61 @@ def game_phase(position: str) -> int:
     return (phase * 256 + (TOTAL_PHASE // 2)) // TOTAL_PHASE
 
 
-def interpolate_evaluations(midgame_score: int, endgame_score: int, phase: int) -> int:
+def interpolate(midgame_score: int, endgame_score: int, phase: int) -> int:
     """Uses the game phase to interpolate between the midgame and endgame scores."""
     return ((midgame_score * (256 - phase)) + (endgame_score * phase)) // 256
 
 
-def evaluate_position_midgame(position: str) -> int:
-    """Evaluates the given position for the side-to-move using the midgame piece values, piece-square tables, and king
-    tropism scores."""
-    score: int = 0
+def evaluate_position(position: str) -> int:
+    """Evaluates the given position for the side-to-move using material values, piece square tables, king tropism,
+    and mop-up bonus and interpolating between midgame and endgame scores."""
+    midgame_score: int = 0
+    endgame_score: int = 0
     king_square: int = position.find("K") if "K" in position else 0
     opponent_king_square: int = position.find("k") if "k" in position else 0
     for square, piece in enumerate(position):
         if piece.isupper():  # ally piece
-            score += MIDGAME_PIECE_VALUES[piece] + MIDGAME_PIECE_SQUARE_TABLES[piece][square]
-            score += MIDGAME_TROPISM_VALUES[piece] * (14 - manhattan_distance(square, opponent_king_square)) // 14
+            midgame_score += MIDGAME_PIECE_VALUES[piece] + MIDGAME_PIECE_SQUARE_TABLES[piece][square]
+            midgame_score += MIDGAME_TROPISM_VALUES[piece] * (14 - manhattan_distance(square, opponent_king_square)) // 14
+            endgame_score += ENDGAME_PIECE_VALUES[piece] + ENDGAME_PIECE_SQUARE_TABLES[piece][square]
+            endgame_score += ENDGAME_TROPISM_VALUES[piece] * (14 - manhattan_distance(square, opponent_king_square)) // 14
         elif piece.islower():  # opponent piece
-            score -= MIDGAME_PIECE_VALUES[piece.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
-            score -= MIDGAME_TROPISM_VALUES[piece.upper()] * (14 - manhattan_distance(square, king_square)) // 14
-    return score
-
-
-def evaluate_position_endgame(position: str) -> int:
-    """Evaluates the given position for the side-to-move using the endgame piece values, piece-square tables, king
-    tropism scores, and mop-up bonus."""
-    score: int = 0
-    king_square: int = position.find("K") if "K" in position else 0
-    opponent_king_square: int = position.find("k") if "k" in position else 0
-    for square, piece in enumerate(position):
-        if piece.isupper():  # ally piece
-            score += ENDGAME_PIECE_VALUES[piece] + ENDGAME_PIECE_SQUARE_TABLES[piece][square]
-            score += ENDGAME_TROPISM_VALUES[piece] * (14 - manhattan_distance(square, opponent_king_square)) // 14
-        elif piece.islower():  # opponent piece
-            score -= ENDGAME_PIECE_VALUES[piece.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
-            score -= ENDGAME_TROPISM_VALUES[piece.upper()] * (14 - manhattan_distance(square, king_square)) // 14
+            midgame_score -= MIDGAME_PIECE_VALUES[piece.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
+            midgame_score -= MIDGAME_TROPISM_VALUES[piece.upper()] * (14 - manhattan_distance(square, king_square)) // 14
+            endgame_score -= ENDGAME_PIECE_VALUES[piece.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
+            endgame_score -= ENDGAME_TROPISM_VALUES[piece.upper()] * (14 - manhattan_distance(square, king_square)) // 14
     if position.count("P") + position.count("p") <= 6:
         mop_up_bonus: int = MOP_UP_SCORE * (14 - manhattan_distance(king_square, opponent_king_square)) // 14
-        if score > 0:
-            score += mop_up_bonus
-        elif score < 0:
-            score -= mop_up_bonus
-    return score
-
-
-def evaluate_position(position: str) -> int:
-    """Evaluates the given position for the side-to-move by interpolating between the midgame and endgame evaluations."""
-    midgame_score: int = evaluate_position_midgame(position)
-    endgame_score: int = evaluate_position_endgame(position)
-    phase: int = game_phase(position)
-    return interpolate_evaluations(midgame_score, endgame_score, phase)
-
-
-def evaluate_move_midgame(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
-    """Evaluates the given move for the side-to-move using the midgame piece values and piece-square tables."""
-    start_square: int = move[0]
-    end_square: int = move[1]
-    piece_moved: str = position[start_square]
-    piece_captured: str = move[2]
-    promotion_piece: str = move[3]
-    score: int = MIDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - MIDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
-    if piece_captured.islower():  # capture
-        score += MIDGAME_PIECE_VALUES[piece_captured.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
-    if piece_moved == "K" and abs(start_square - end_square) == 2:  # castling
-        score += MIDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - MIDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
-    if piece_moved == "P":
-        if A8 <= end_square <= H8:  # pawn promotion
-            score += MIDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - MIDGAME_PIECE_SQUARE_TABLES["P"][end_square] + MIDGAME_PIECE_VALUES[promotion_piece] - MIDGAME_PIECE_VALUES["P"]
-        if end_square + SOUTH == en_passant:
-            score += MIDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
-    return score
-
-
-def evaluate_move_endgame(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
-    """Evaluates the given move for the side-to-move using the endgame piece values and piece-square tables."""
-    start_square: int = move[0]
-    end_square: int = move[1]
-    piece_moved: str = position[start_square]
-    piece_captured: str = move[2]
-    promotion_piece: str = move[3]
-    score: int = ENDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - ENDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
-    if piece_captured.islower():  # capture
-        score += ENDGAME_PIECE_VALUES[piece_captured.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
-    if piece_moved == "K" and abs(start_square - end_square) == 2:  # castling
-        score += ENDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - ENDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
-    if piece_moved == "P":
-        if A8 <= end_square <= H8:  # pawn promotion
-            score += ENDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - ENDGAME_PIECE_SQUARE_TABLES["P"][end_square] + ENDGAME_PIECE_VALUES[promotion_piece] - ENDGAME_PIECE_VALUES["P"]
-        if end_square + SOUTH == en_passant:
-            score += ENDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
-    return score
+        if endgame_score > 0:
+            endgame_score += mop_up_bonus
+        elif endgame_score < 0:
+            endgame_score -= mop_up_bonus
+    return interpolate(midgame_score, endgame_score, game_phase(position))
 
 
 def evaluate_move(move: tuple[int, int, str, str], position: str, en_passant: int) -> int:
-    """Evaluates the given move for the side-to-move by interpolating between the midgame and endgame evaluations."""
-    midgame_score: int = evaluate_move_midgame(move, position, en_passant)
-    endgame_score: int = evaluate_move_endgame(move, position, en_passant)
-    phase: int = game_phase(position)
-    return interpolate_evaluations(midgame_score, endgame_score, phase)
+    """Evaluates the given move for the side-to-move by interpolating between midgame and endgame scores."""
+    start_square: int = move[0]
+    end_square: int = move[1]
+    piece_moved: str = position[start_square]
+    piece_captured: str = move[2]
+    promotion_piece: str = move[3]
+    midgame_score: int = MIDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - MIDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
+    endgame_score: int = ENDGAME_PIECE_SQUARE_TABLES[piece_moved][end_square] - ENDGAME_PIECE_SQUARE_TABLES[piece_moved][start_square]
+    if piece_captured.islower():  # capture
+        midgame_score += MIDGAME_PIECE_VALUES[piece_captured.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
+        endgame_score += ENDGAME_PIECE_VALUES[piece_captured.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece_captured.upper()][(11 - (end_square // 10)) * 10 + (end_square % 10)]
+    if piece_moved == "K" and abs(start_square - end_square) == 2:  # castling
+        midgame_score += MIDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - MIDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
+        endgame_score += ENDGAME_PIECE_SQUARE_TABLES["R"][(start_square + end_square) // 2] - ENDGAME_PIECE_SQUARE_TABLES["R"][A1 if end_square < start_square else H1]
+    if piece_moved == "P":
+        if A8 <= end_square <= H8:  # pawn promotion
+            midgame_score += MIDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - MIDGAME_PIECE_SQUARE_TABLES["P"][end_square] + MIDGAME_PIECE_VALUES[promotion_piece] - MIDGAME_PIECE_VALUES["P"]
+            endgame_score += ENDGAME_PIECE_SQUARE_TABLES[promotion_piece][end_square] - ENDGAME_PIECE_SQUARE_TABLES["P"][end_square] + ENDGAME_PIECE_VALUES[promotion_piece] - ENDGAME_PIECE_VALUES["P"]
+        if end_square + SOUTH == en_passant:
+            midgame_score += MIDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
+            endgame_score += ENDGAME_PIECE_SQUARE_TABLES["P"][(11 - ((end_square + SOUTH) // 10)) * 10 + ((end_square + SOUTH) % 10)]
+    return interpolate(midgame_score, endgame_score, game_phase(position))
 
 
 def principal_variation(length: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> list[tuple[int, int, str, str]]:
@@ -1250,16 +1196,10 @@ def main() -> None:
             best_move: tuple[int, int, str, str] = iteratively_deepen(depth, position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             send_response(f"bestmove {algebraic_notation(best_move, color)}")
         elif tokens[0] == "eval":
-            midgame_score: float = evaluate_position_midgame(position) / 100
-            endgame_score: float = evaluate_position_endgame(position) / 100
-            final_score: float = evaluate_position(position) / 100
+            score: float = evaluate_position(position) / 100
             if color == "b":
-                midgame_score *= -1
-                endgame_score *= -1
-                final_score *= -1
-            send_response(f"midgame static eval: {'+' if str(midgame_score)[0] != '-' else ''}{midgame_score}")
-            send_response(f"endgame static eval: {'+' if str(endgame_score)[0] != '-' else ''}{endgame_score}")
-            send_response(f"final static eval: {'+' if str(final_score)[0] != '-' else ''}{final_score}")
+                score *= -1
+            send_response(f"static eval: {'+' if str(score)[0] != '-' else ''}{score}")
         elif tokens[0] == "board":
             board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             for row in board:
