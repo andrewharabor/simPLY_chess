@@ -8,7 +8,7 @@ A simple chess engine written in Python. This project was heavily inspired by [S
 
  I initially planned to use the official [API](https://github.com/lichess-bot-devs/lichess-bot) to put the engine on [Lichess](https://lichess.org/) but until then, just import the engine in a [UCI](https://gist.github.com/DOBRO/2592c6dad754ba67e6dcaec8c90165bf) [GUI](https://www.chessprogramming.org/GUI) if you want to play against it.
 
-[simPLY_chess3-vs-Stockfish15.webm](https://github.com/andrewharabor/simPLY_chess/assets/120438036/8f3f4cd9-d75c-48a6-a358-b2adb123ee77)
+[simPLY_chess3-vs-Stockfish15.webm](https://github.com/andrewharabor/simPLY_chess/assets/120438036/c123fe6f-eb55-4519-94e3-369581782ea3)
 
 ## Features
 
