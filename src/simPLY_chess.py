@@ -7,7 +7,7 @@ import time
 
 NAME: str = "simPLY_chess"
 AUTHOR: str = "andrewharabor"
-VERSION: str = "3.0"
+VERSION: str = "3.1"
 
 ##################################
 # CONSTANTS AND GLOBAL VARIABLES #
@@ -62,8 +62,8 @@ INITIAL_COLOR: str = "w"  # the current player's color
 # Transposition table, used to store previously calculated positions and keep track of the best move
 TRANSPOSITION_TABLE: dict[int, tuple[tuple[int, int, str, str], int, int]] = {}  # format is {zobrist_key: (best_move, depth, score)}
 
-# Piece values and piece square tables for the middlegame and endgame
-# Used to evaluate the position in terms of material and piece placement
+# Piece values, piece square tables, and tropism values for the middlegame and endgame
+# Used to evaluate the position in terms of material and piece placement, and king safety
 MIDGAME_PAWN_VALUE: int = 100  # all values are in centipawns
 MIDGAME_KNIGHT_VALUE: int = 411
 MIDGAME_BISHOP_VALUE: int = 445
@@ -78,6 +78,15 @@ MIDGAME_PIECE_VALUES: dict[str, int] = {
     "R": MIDGAME_ROOK_VALUE,
     "Q": MIDGAME_QUEEN_VALUE,
     "K": MIDGAME_KING_VALUE
+}
+
+MIDGAME_TROPISM_VALUES: dict[str, int] = {
+    "P": MIDGAME_PAWN_VALUE // 15,
+    "N": MIDGAME_KNIGHT_VALUE // 15,
+    "B": MIDGAME_BISHOP_VALUE // 15,
+    "R": MIDGAME_ROOK_VALUE // 15,
+    "Q": MIDGAME_QUEEN_VALUE // 15,
+    "K": MIDGAME_KING_VALUE // 15
 }
 
 MIDGAME_PAWN_TABLE: list[int] = [
@@ -181,6 +190,15 @@ ENDGAME_PIECE_VALUES: dict[str, int] = {
     "K": ENDGAME_KING_VALUE,
 }
 
+ENDGAME_TROPISM_VALUES: dict[str, int] = {
+    "P": ENDGAME_PAWN_VALUE // 7,
+    "N": ENDGAME_KNIGHT_VALUE // 7,
+    "B": ENDGAME_BISHOP_VALUE // 7,
+    "R": ENDGAME_ROOK_VALUE // 7,
+    "Q": ENDGAME_QUEEN_VALUE // 7,
+    "K": ENDGAME_KING_VALUE // 7,
+}
+
 ENDGAME_PAWN_TABLE: list[int] = [
        0,    0,    0,    0,    0,    0,    0,    0,
      217,  211,  193,  163,  179,  161,  201,  228,
@@ -265,6 +283,8 @@ for piece in "PNBRQK":
         new_table += [0] + ENDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
     new_table += blank_row + blank_row
     ENDGAME_PIECE_SQUARE_TABLES[piece] = new_table
+
+MOP_UP_SCORE: int = ENDGAME_PAWN_VALUE * 125 // 100  # used to encourage kings to be closer to each other if winning an endgame position
 
 # Checkmate scores
 CHECKMATE_UPPER: int = ENDGAME_KING_VALUE + 10 * ENDGAME_QUEEN_VALUE
@@ -648,6 +668,10 @@ def king_in_check(position: str, castling: list[bool], king_passant: int) -> boo
 # EVALUATION FUNCTIONS #
 ########################
 
+def manhattan_distance(square1: int, square2: int) -> int:
+    """Calculates the Manhattan distance between two squares."""
+    return abs(square1 % 10 - square2 % 10) + abs(square1 // 10 - square2 // 10)
+
 def game_phase(position: str) -> int:
     """Evaluates the current game phase though piece counts."""
     phase: int = TOTAL_PHASE
@@ -664,24 +688,40 @@ def interpolate_evaluations(midgame_score: int, endgame_score: int, phase: int) 
 
 
 def evaluate_position_midgame(position: str) -> int:
-    """Evaluates the given position for the side-to-move using the midgame piece values and piece-square tables."""
+    """Evaluates the given position for the side-to-move using the midgame piece values, piece-square tables, and king
+    tropism scores."""
     score: int = 0
+    king_square: int = position.find("K") if "K" in position else 0
+    opponent_king_square: int = position.find("k") if "k" in position else 0
     for square, piece in enumerate(position):
         if piece.isupper():  # ally piece
             score += MIDGAME_PIECE_VALUES[piece] + MIDGAME_PIECE_SQUARE_TABLES[piece][square]
+            score += MIDGAME_TROPISM_VALUES[piece] * (14 - manhattan_distance(square, opponent_king_square)) // 14
         elif piece.islower():  # opponent piece
             score -= MIDGAME_PIECE_VALUES[piece.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
+            score -= MIDGAME_TROPISM_VALUES[piece.upper()] * (14 - manhattan_distance(square, king_square)) // 14
     return score
 
 
 def evaluate_position_endgame(position: str) -> int:
-    """Evaluates the given position for the side-to-move using the endgame piece values and piece-square tables."""
+    """Evaluates the given position for the side-to-move using the endgame piece values, piece-square tables, king
+    tropism scores, and mop-up bonus."""
     score: int = 0
+    king_square: int = position.find("K") if "K" in position else 0
+    opponent_king_square: int = position.find("k") if "k" in position else 0
     for square, piece in enumerate(position):
         if piece.isupper():  # ally piece
             score += ENDGAME_PIECE_VALUES[piece] + ENDGAME_PIECE_SQUARE_TABLES[piece][square]
+            score += ENDGAME_TROPISM_VALUES[piece] * (14 - manhattan_distance(square, opponent_king_square)) // 14
         elif piece.islower():  # opponent piece
             score -= ENDGAME_PIECE_VALUES[piece.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
+            score -= ENDGAME_TROPISM_VALUES[piece.upper()] * (14 - manhattan_distance(square, king_square)) // 14
+    if position.count("P") + position.count("p") <= 6:
+        mop_up_bonus: int = MOP_UP_SCORE * (14 - manhattan_distance(king_square, opponent_king_square)) // 14
+        if score > 0:
+            score += mop_up_bonus
+        elif score < 0:
+            score -= mop_up_bonus
     return score
 
 
@@ -906,7 +946,7 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
     if table_info is None:
         table_info = ((0, 0, "", ""), -1, 0)
     if table_info[1] >= depth or table_info[2] >= CHECKMATE_LOWER:  # move is from higher depth or position is checkmate
-        return evaluate_position(position), table_info[0]
+        return table_info[2], table_info[0]
 
     nodes += 1
     legal_moves: list[tuple[int, int, str, str]] = []  # keep track of legal moves for checkmate and stalemate detection
@@ -1202,9 +1242,7 @@ def main() -> None:
                 if color == 'b':
                     white_time, black_time = black_time, white_time
                     white_increment, black_increment = black_increment, white_increment
-                if white_time <= 10:
-                    time_limit = 0.5
-                elif white_time <= 60:
+                if white_time <= 60:
                     time_limit = 1
                 else:
                     time_limit = white_time / 40 + white_increment
