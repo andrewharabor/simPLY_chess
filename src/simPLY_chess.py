@@ -7,7 +7,7 @@ import time
 
 NAME: str = "simPLY_chess"
 AUTHOR: str = "andrewharabor"
-VERSION: str = "3.1"
+VERSION: str = "3.2"
 
 ##################################
 # CONSTANTS AND GLOBAL VARIABLES #
@@ -80,7 +80,7 @@ MIDGAME_PIECE_VALUES: dict[str, int] = {
     "K": MIDGAME_KING_VALUE
 }
 
-MIDGAME_TROPISM_VALUES: dict[str, int] = {piece: value // 15 for piece, value in MIDGAME_PIECE_VALUES.items()}
+MIDGAME_TROPISM_VALUES: dict[str, int] = {piece: value // 5 for piece, value in MIDGAME_PIECE_VALUES.items()}
 
 
 MIDGAME_PAWN_TABLE: list[int] = [
@@ -184,7 +184,7 @@ ENDGAME_PIECE_VALUES: dict[str, int] = {
     "K": ENDGAME_KING_VALUE,
 }
 
-ENDGAME_TROPISM_VALUES: dict[str, int] = {piece: value // 7 for piece, value in ENDGAME_PIECE_VALUES.items()}
+ENDGAME_TROPISM_VALUES: dict[str, int] = {piece: value // 3 for piece, value in ENDGAME_PIECE_VALUES.items()}
 
 ENDGAME_PAWN_TABLE: list[int] = [
        0,    0,    0,    0,    0,    0,    0,    0,
@@ -271,7 +271,7 @@ for piece in "PNBRQK":
     new_table += blank_row + blank_row
     ENDGAME_PIECE_SQUARE_TABLES[piece] = new_table
 
-MOP_UP_SCORE: int = ENDGAME_PAWN_VALUE * 125 // 100  # used to encourage kings to be closer to each other if winning an endgame position
+MOP_UP_SCORE: int = ENDGAME_PAWN_VALUE * 2 # used to encourage kings to be closer to each other if winning an endgame position
 
 # Checkmate scores
 CHECKMATE_UPPER: int = ENDGAME_KING_VALUE + 10 * ENDGAME_QUEEN_VALUE
@@ -511,7 +511,8 @@ DECODED_PROMOTION_PIECES: dict[int, str] = {
 # alternative.bin is by Flavio Martin and is a great book for analysis and play
 # basic.bin was released by Richard Pijl and is claimed to be nearly identical to the book used in the 2018 WCCC though it isn't too strong
 # database.bin contains nearly 1 million entries and has the most extensive opening data yet every move is weighted equally meaning it is better as a database than for play
-BOOK_PATH: str = "src/opening_books/default.bin"
+BOOK_NAME: str = "default.bin"
+BOOK_PATH: str = f"src/opening_books/{BOOK_NAME}"
 
 # Load opening book data
 with open(BOOK_PATH, "rb") as file:
@@ -685,20 +686,19 @@ def evaluate_position(position: str) -> int:
     for square, piece in enumerate(position):
         if piece.isupper():  # ally piece
             midgame_score += MIDGAME_PIECE_VALUES[piece] + MIDGAME_PIECE_SQUARE_TABLES[piece][square]
-            midgame_score += MIDGAME_TROPISM_VALUES[piece] * (14 - manhattan_distance(square, opponent_king_square)) // 14
+            midgame_score += MIDGAME_TROPISM_VALUES[piece] // manhattan_distance(square, opponent_king_square)
             endgame_score += ENDGAME_PIECE_VALUES[piece] + ENDGAME_PIECE_SQUARE_TABLES[piece][square]
-            endgame_score += ENDGAME_TROPISM_VALUES[piece] * (14 - manhattan_distance(square, opponent_king_square)) // 14
+            endgame_score += ENDGAME_TROPISM_VALUES[piece] // manhattan_distance(square, opponent_king_square)
         elif piece.islower():  # opponent piece
             midgame_score -= MIDGAME_PIECE_VALUES[piece.upper()] + MIDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
-            midgame_score -= MIDGAME_TROPISM_VALUES[piece.upper()] * (14 - manhattan_distance(square, king_square)) // 14
+            midgame_score -= MIDGAME_TROPISM_VALUES[piece.upper()] // manhattan_distance(square, king_square)
             endgame_score -= ENDGAME_PIECE_VALUES[piece.upper()] + ENDGAME_PIECE_SQUARE_TABLES[piece.upper()][(11 - (square // 10)) * 10 + (square % 10)]
-            endgame_score -= ENDGAME_TROPISM_VALUES[piece.upper()] * (14 - manhattan_distance(square, king_square)) // 14
-    if position.count("P") + position.count("p") <= 6:
-        mop_up_bonus: int = MOP_UP_SCORE * (14 - manhattan_distance(king_square, opponent_king_square)) // 14
-        if endgame_score > 0:
-            endgame_score += mop_up_bonus
-        elif endgame_score < 0:
-            endgame_score -= mop_up_bonus
+            endgame_score -= ENDGAME_TROPISM_VALUES[piece.upper()] // manhattan_distance(square, king_square)
+    mop_up_bonus: int = MOP_UP_SCORE * (14 - manhattan_distance(king_square, opponent_king_square)) // 14
+    if endgame_score > 0:
+        endgame_score += mop_up_bonus
+    elif endgame_score < 0:
+        endgame_score -= mop_up_bonus
     return interpolate(midgame_score, endgame_score, game_phase(position))
 
 
@@ -808,30 +808,24 @@ def all_entries(position: str, castling: list[bool], opponent_castling: list[boo
     return entries
 
 
-def max_entry(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> tuple[int, int, str, str]:
-    """Returns the move with the highest weight from the PolyGlot opening book for the given position."""
+def book_entries(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> tuple[tuple[int, int, str, str], tuple[int, int, str, str]]:
+    """Returns the maximum entry and a random entry by weight from the PolyGlot opening book for the given position."""
     entries: list[tuple[tuple[int, int, str, str], int]] = all_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     if len(entries) == 0:
-        return (0, 0, "", "")
+        return (0, 0, "", ""), (0, 0, "", "")
 
-    return max(entries, key=lambda x: x[1])[0]
-
-
-def weighted_entry(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> tuple[int, int, str, str]:
-    """Returns a random entry by weight from the PolyGlot opening book for the given position."""
-    entries: list[tuple[tuple[int, int, str, str], int]] = all_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
-    if len(entries) == 0:
-        return (0, 0, "", "")
-
+    max_entry: tuple[int, int, str, str] = max(entries, key=lambda pair: (pair[1], evaluate_move(pair[0], position, en_passant)))[0]
+    weighted_entry: tuple[int, int, str, str] = (0, 0, "", "")
     weight_sum: int = sum([entry[1] for entry in entries])
     target: int = random.randint(0, weight_sum)
+    random.shuffle(entries)
     current_sum: int = 0
     for entry in entries:
         current_sum += entry[1]
         if current_sum >= target:
-            return entry[0]
-
-    return (0, 0, "", "")
+            weighted_entry = entry[0]
+            break
+    return max_entry, weighted_entry
 
 
 ################
@@ -936,10 +930,17 @@ def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent
     """Wraps the negamax search function in an iterative deepening loop, utilizing the transposition table and PV move
     ordering to improve search efficiency."""
     global max_depth, nodes, start_time, timeout
-    book_move: tuple[int, int, str, str] = weighted_entry(position, castling[:], opponent_castling[:], en_passant, king_passant, color)  # max_entry() is more accurate but has less variation
-    if book_move != (0, 0, "", ""):
-        send_response("info string bookmove")
-        return book_move
+    weighted_entry: tuple[int, int, str, str]
+    _, weighted_entry = book_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+    if weighted_entry != (0, 0, "", ""):
+        send_response(f"info string {BOOK_NAME} weighted bookmove")
+        return weighted_entry
+
+    # max_entry: tuple[int, int, str, str]
+    # max_entry, _ = book_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+    # if max_entry != (0, 0, "", ""):
+    #     send_response(f"info string {BOOK_NAME} max bookmove")
+    #     return max_entry
 
     score: int = 0
     best_move: tuple[int, int, str, str] = (0, 0, "", "")
@@ -1112,7 +1113,7 @@ def main() -> None:
         elif tokens[0] == "quit":
             sys.exit()
         elif tokens[0] == "ucinewgame":
-            TRANSPOSITION_TABLE.clear()
+            continue
         elif tokens[0] == "position":
             if len(tokens) >= 2 and tokens[1] == "startpos":
                 position = INITIAL_POSITION
