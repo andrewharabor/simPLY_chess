@@ -1155,7 +1155,7 @@ def main() -> None:
         elif tokens[0] == "go":
             if len(position) != 120 or len(castling) != 2 or len(opponent_castling) != 2 or not 0 <= en_passant <= 119 or not 0 <= king_passant <= 119 or color not in ("w", "b"):  # invalid position
                 continue
-            depth: int = 5
+            depth: int = 30
             time_limit = 10  # all times are in seconds
             if "movetime" in tokens:
                 movetime_index: int = tokens.index("movetime") + 1
