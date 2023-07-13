@@ -1166,8 +1166,8 @@ def main() -> None:
                 if tokens[depth_index].isdigit():
                     depth = int(tokens[depth_index])
             if "wtime" in tokens or "btime" in tokens or "winc" in tokens or "binc" in tokens:
-                white_time: float = 200  # default values in case not all time controls are specified
-                black_time: float = 200  # these values equate to about 5 seconds of move time
+                white_time: float = 400  # default values in case not all time controls are specified
+                black_time: float = 400  # these values equate to about 10 seconds of move time
                 white_increment: float = 0
                 black_increment: float = 0
                 if "wtime" in tokens:
