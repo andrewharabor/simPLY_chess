@@ -795,7 +795,7 @@ def book_entries(position: str, castling: list[bool], opponent_castling: list[bo
     if len(total_entries) == 0:
         return (0, 0, "", ""), (0, 0, "", "")
 
-    print([(algebraic_notation(move, color), weight) for move, weight in total_entries])
+    # print([(algebraic_notation(move, color), weight) for move, weight in total_entries])
 
     max_entry: tuple[int, int, str, str] = max(total_entries, key=lambda pair: (pair[1], evaluate_move(pair[0], position, en_passant)))[0]
     weighted_entry: tuple[int, int, str, str] = (0, 0, "", "")
