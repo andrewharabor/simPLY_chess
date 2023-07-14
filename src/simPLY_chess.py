@@ -1108,7 +1108,7 @@ def main() -> None:
                     MIDGAME_PIECE_SQUARE_TABLES[piece] = new_midgame_table + blank_row + blank_row
                     ENDGAME_PIECE_SQUARE_TABLES[piece] = new_endgame_table + blank_row + blank_row
                 # Load opening book data
-                OPENING_BOOKS = [load_book("main1")]  # possible to load multiple books but main1.bin has more than 1 million entries
+                OPENING_BOOKS = [load_book("main" + str(num)) for num in range(1, 8)]  # possible to load each book individually
                 # Global variable initialization
                 max_depth = 0
                 nodes = 0
