@@ -7,7 +7,7 @@ import time
 
 NAME: str = "simPLY_chess"
 AUTHOR: str = "andrewharabor"
-VERSION: str = "3.2"
+VERSION: str = "3.3"
 
 ##################################
 # CONSTANTS AND GLOBAL VARIABLES #
@@ -158,16 +158,6 @@ MIDGAME_PIECE_SQUARE_TABLES: dict[str, list[int]] = {
     "K": MIDGAME_KING_TABLE,
 }
 
-# Pad the midgame tables with zeros to make them 10x12
-for piece in "PNBRQK":
-    new_table: list[int] = []
-    blank_row: list[int] = [0] * 10
-    new_table += blank_row + blank_row
-    for row in range(0, 64, 8):
-        new_table += [0] + MIDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
-    new_table += blank_row + blank_row
-    MIDGAME_PIECE_SQUARE_TABLES[piece] = new_table
-
 ENDGAME_PAWN_VALUE: int = 115
 ENDGAME_KNIGHT_VALUE: int = 343
 ENDGAME_BISHOP_VALUE: int = 362
@@ -260,16 +250,6 @@ ENDGAME_PIECE_SQUARE_TABLES: dict[str, list[int]] = {
     "Q": ENDGAME_QUEEN_TABLE,
     "K": ENDGAME_KING_TABLE,
 }
-
-# Pad the endgame tables with zeros to make them 10x12
-for piece in "PNBRQK":
-    blank_row: list[int] = [0] * 10
-    new_table: list[int] = []
-    new_table += blank_row + blank_row
-    for row in range(0, 64, 8):
-        new_table += [0] + ENDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
-    new_table += blank_row + blank_row
-    ENDGAME_PIECE_SQUARE_TABLES[piece] = new_table
 
 MOP_UP_SCORE: int = ENDGAME_PAWN_VALUE * 2 # used to encourage kings to be closer to each other if winning an endgame position
 
@@ -507,27 +487,6 @@ DECODED_PROMOTION_PIECES: dict[int, str] = {
     4: "Q",
 }
 
-# default.bin is Komodo3's opening book by Salvo Spitaleri and is an extensive and accurate book for strong positional play
-# alternative.bin is by Flavio Martin and is a great book for analysis and play
-# basic.bin was released by Richard Pijl and is claimed to be nearly identical to the book used in the 2018 WCCC though it isn't too strong
-# database.bin contains nearly 1 million entries and has the most extensive opening data yet every move is weighted equally meaning it is better as a database than for play
-BOOK_NAME: str = "default.bin"
-BOOK_PATH: str = f"src/opening_books/{BOOK_NAME}"
-
-# Load opening book data
-with open(BOOK_PATH, "rb") as file:
-    file_content: bytes = file.read()
-integer_data: list[int] = list(struct.unpack(">" + ("QHHI" * (len(file_content) // 16)), file_content))
-OPENING_BOOK: list[list[int]] = [integer_data[i:i + 4] for i in range(0, len(integer_data), 4)]
-
-# Global main loop variable initialization
-global max_depth, nodes, start_time, time_limit, timeout
-max_depth: int = 0
-nodes: int = 0
-start_time: float = 0
-time_limit: float = 0
-timeout: bool = False
-
 
 ###############
 # BOARD LOGIC #
@@ -744,6 +703,14 @@ def principal_variation(length: int, position: str, castling: list[bool], oppone
 # HASHING AND OPENING BOOK FUNCTIONS #
 ######################################
 
+def load_book(book_name: str) -> list[list[int]]:
+    """Loads an opening book and returns it as a list of lists of raw integer data."""
+    with open(f"src/opening_books/{book_name}.bin", "rb") as file:
+        file_content: bytes = file.read()
+    integer_data: list[int] = list(struct.unpack(">" + ("QHHI" * (len(file_content) // 16)), file_content))
+    return [integer_data[i:i + 4] for i in range(0, len(integer_data), 4)]
+
+
 def zobrist_hash(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> int:
     """Calculates a Zobrist hash for the given position using the PolyGlot book format."""
     if color == "b":
@@ -783,11 +750,11 @@ def zobrist_hash(position: str, castling: list[bool], opponent_castling: list[bo
     return piece_hash ^ castling_hash ^ en_passant_hash ^ turn_hash
 
 
-def all_entries(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> list[tuple[tuple[int, int, str, str], int]]:
+def all_entries(opening_book: list[list[int]], position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> list[tuple[tuple[int, int, str, str], int]]:
     """Returns all entries in the PolyGlot opening book for the given position."""
     key: int = zobrist_hash(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     entries: list[tuple[tuple[int, int, str, str], int]] = []
-    for entry_key, raw_move, weight, _ in OPENING_BOOK:
+    for entry_key, raw_move, weight, _ in opening_book:
         if entry_key == key:
             endian_start_square: int = (raw_move >> 6) & 0x3f
             endian_end_square: int = raw_move & 0x3f
@@ -810,17 +777,33 @@ def all_entries(position: str, castling: list[bool], opponent_castling: list[boo
 
 def book_entries(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> tuple[tuple[int, int, str, str], tuple[int, int, str, str]]:
     """Returns the maximum entry and a random entry by weight from the PolyGlot opening book for the given position."""
-    entries: list[tuple[tuple[int, int, str, str], int]] = all_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
-    if len(entries) == 0:
+
+    total_entries: list[tuple[tuple[int, int, str, str], int]] = []
+
+    for book in OPENING_BOOKS:
+        entries: list[tuple[tuple[int, int, str, str], int]] = all_entries(book, position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+        for new_entry in entries:
+            found: bool = False
+            for i, entry in enumerate(total_entries):
+                if entry[0] == new_entry[0]:
+                    total_entries[i] = (entry[0], entry[1] + new_entry[1]) # combine the weights of all opening books
+                    found = True
+                    break
+            if not found:
+                total_entries.append(new_entry) # add new entries to the list if not already present
+
+    if len(total_entries) == 0:
         return (0, 0, "", ""), (0, 0, "", "")
 
-    max_entry: tuple[int, int, str, str] = max(entries, key=lambda pair: (pair[1], evaluate_move(pair[0], position, en_passant)))[0]
+    print([(algebraic_notation(move, color), weight) for move, weight in total_entries])
+
+    max_entry: tuple[int, int, str, str] = max(total_entries, key=lambda pair: (pair[1], evaluate_move(pair[0], position, en_passant)))[0]
     weighted_entry: tuple[int, int, str, str] = (0, 0, "", "")
-    weight_sum: int = sum([entry[1] for entry in entries])
+    weight_sum: int = sum([entry[1] for entry in total_entries])
     target: int = random.randint(0, weight_sum)
-    random.shuffle(entries)
+    random.shuffle(total_entries)
     current_sum: int = 0
-    for entry in entries:
+    for entry in total_entries:
         current_sum += entry[1]
         if current_sum >= target:
             weighted_entry = entry[0]
@@ -933,13 +916,13 @@ def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent
     weighted_entry: tuple[int, int, str, str]
     _, weighted_entry = book_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     if weighted_entry != (0, 0, "", ""):
-        send_response(f"info string {BOOK_NAME} weighted bookmove")
+        send_response(f"info string weighted bookmove")
         return weighted_entry
 
     # max_entry: tuple[int, int, str, str]
     # max_entry, _ = book_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     # if max_entry != (0, 0, "", ""):
-    #     send_response(f"info string {BOOK_NAME} max bookmove")
+    #     send_response(f"info string max bookmove")
     #     return max_entry
 
     score: int = 0
@@ -1215,4 +1198,42 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Before running main(), intialize the piece square tables and the opening books:
+
+    # Pad the midgame tables with zeros to make them 10x12
+    for piece in "PNBRQK":
+        new_table: list[int] = []
+        blank_row: list[int] = [0] * 10
+        new_table += blank_row + blank_row
+        for row in range(0, 64, 8):
+            new_table += [0] + MIDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
+        new_table += blank_row + blank_row
+        MIDGAME_PIECE_SQUARE_TABLES[piece] = new_table
+
+    # Pad the endgame tables with zeros to make them 10x12
+    for piece in "PNBRQK":
+        blank_row: list[int] = [0] * 10
+        new_table: list[int] = []
+        new_table += blank_row + blank_row
+        for row in range(0, 64, 8):
+            new_table += [0] + ENDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
+        new_table += blank_row + blank_row
+        ENDGAME_PIECE_SQUARE_TABLES[piece] = new_table
+
+    # default.bin is Komodo3's opening book by Salvo Spitaleri and is an extensive and accurate book for strong positional play
+    # alternative.bin is by Flavio Martin and is a great book for analysis and play
+    # basic.bin was released by Richard Pijl and is claimed to be nearly identical to the book used in the 2018 WCCC though it isn't too strong
+    # database.bin contains nearly 1 million entries and has the most extensive opening data yet every move is weighted equally meaning it is better as a database than for play
+
+    # Load opening book data
+    OPENING_BOOKS: list[list[list[int]]] = [load_book("default"), load_book("alternative"), load_book("basic"), load_book("database")]
+
+    # Global main loop variable initialization
+    global max_depth, nodes, start_time, time_limit, timeout
+    max_depth: int = 0
+    nodes: int = 0
+    start_time: float = 0
+    time_limit: float = 0
+    timeout: bool = False
+
     main()
