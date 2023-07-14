@@ -795,8 +795,6 @@ def book_entries(position: str, castling: list[bool], opponent_castling: list[bo
     if len(total_entries) == 0:
         return (0, 0, "", ""), (0, 0, "", "")
 
-    # print([(algebraic_notation(move, color), weight) for move, weight in total_entries])
-
     max_entry: tuple[int, int, str, str] = max(total_entries, key=lambda pair: (pair[1], evaluate_move(pair[0], position, en_passant)))[0]
     weighted_entry: tuple[int, int, str, str] = (0, 0, "", "")
     weight_sum: int = sum([entry[1] for entry in total_entries])
@@ -1075,13 +1073,16 @@ def send_response(response: str) -> None:
 
 def main() -> None:
     """The main UCI loop responsible for parsing commands and sending responses."""
-    global time_limit
+    global max_depth, nodes, start_time, time_limit, timeout, OPENING_BOOKS
     position: str = ""
     castling: list[bool] = []
     opponent_castling: list[bool] = []
     en_passant: int = 120
     king_passant: int = 120
     color: str = ""
+
+    initialized: bool = False
+
     while True:
         command: str = sys.stdin.readline().strip()
         tokens: list[str] = command.split()
@@ -1091,12 +1092,32 @@ def main() -> None:
             send_response(f"id name {NAME} {VERSION}")
             send_response(f"id author {AUTHOR}")
             send_response("uciok")
-        elif tokens[0] == "isready":
-            send_response("readyok")
         elif tokens[0] == "quit":
             sys.exit()
-        elif tokens[0] == "ucinewgame":
-            continue
+        elif tokens[0] == "isready":
+            if not initialized:
+                initialized = True
+                # Pad the midgame and endgame tables with zeros to make them 10x12
+                for piece in "PNBRQK":
+                    blank_row: list[int] = [0] * 10
+                    new_midgame_table: list[int] = blank_row + blank_row
+                    new_endgame_table: list[int] = blank_row + blank_row
+                    for row in range(0, 64, 8):
+                        new_midgame_table += [0] + MIDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
+                        new_endgame_table += [0] + ENDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
+                    MIDGAME_PIECE_SQUARE_TABLES[piece] = new_midgame_table + blank_row + blank_row
+                    ENDGAME_PIECE_SQUARE_TABLES[piece] = new_endgame_table + blank_row + blank_row
+                # Load opening book data
+                OPENING_BOOKS = [load_book("main1")]  # possible to load multiple books but main1.bin has more than 1 million entries
+                # Global variable initialization
+                max_depth = 0
+                nodes = 0
+                start_time = 0
+                time_limit = 0
+                timeout = False
+            send_response("readyok")
+        elif not initialized:
+            continue  # ignore most commands until the engine is properly initialized with "isready"
         elif tokens[0] == "position":
             if len(tokens) >= 2 and tokens[1] == "startpos":
                 position = INITIAL_POSITION
@@ -1138,7 +1159,7 @@ def main() -> None:
         elif tokens[0] == "go":
             if len(position) != 120 or len(castling) != 2 or len(opponent_castling) != 2 or not 0 <= en_passant <= 119 or not 0 <= king_passant <= 119 or color not in ("w", "b"):  # invalid position
                 continue
-            depth: int = 30
+            depth: int = 5
             time_limit = 10  # all times are in seconds
             if "movetime" in tokens:
                 movetime_index: int = tokens.index("movetime") + 1
@@ -1198,33 +1219,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # Before running main(), intialize the piece square tables and the opening books:
-
-    # Pad the midgame and endgame tables with zeros to make them 10x12
-    for piece in "PNBRQK":
-        blank_row: list[int] = [0] * 10
-        new_midgame_table: list[int] = blank_row + blank_row
-        new_endgame_table: list[int] = blank_row + blank_row
-        for row in range(0, 64, 8):
-            new_midgame_table += [0] + MIDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
-            new_endgame_table += [0] + ENDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
-        MIDGAME_PIECE_SQUARE_TABLES[piece] = new_midgame_table + blank_row + blank_row
-        ENDGAME_PIECE_SQUARE_TABLES[piece] = new_endgame_table + blank_row + blank_row
-
-    # default.bin is Komodo3's opening book by Salvo Spitaleri
-    # alternative.bin is by Italian player Flavio Martin
-    # basic.bin was released by Richard Pijl and is claimed to be nearly identical to the book used in the 2018 WCCC
-    # database.bin contains nearly 1 million entries and has the most extensive opening data yet all move weights are equal
-
-    # Load opening book data
-    OPENING_BOOKS: list[list[list[int]]] = [load_book("default"), load_book("alternative"), load_book("basic"), load_book("database")]
-
-    # Global main loop variable initialization
-    global max_depth, nodes, start_time, time_limit, timeout
-    max_depth: int = 0
-    nodes: int = 0
-    start_time: float = 0
-    time_limit: float = 0
-    timeout: bool = False
-
     main()
