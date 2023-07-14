@@ -1200,30 +1200,21 @@ def main() -> None:
 if __name__ == "__main__":
     # Before running main(), intialize the piece square tables and the opening books:
 
-    # Pad the midgame tables with zeros to make them 10x12
-    for piece in "PNBRQK":
-        new_table: list[int] = []
-        blank_row: list[int] = [0] * 10
-        new_table += blank_row + blank_row
-        for row in range(0, 64, 8):
-            new_table += [0] + MIDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
-        new_table += blank_row + blank_row
-        MIDGAME_PIECE_SQUARE_TABLES[piece] = new_table
-
-    # Pad the endgame tables with zeros to make them 10x12
+    # Pad the midgame and endgame tables with zeros to make them 10x12
     for piece in "PNBRQK":
         blank_row: list[int] = [0] * 10
-        new_table: list[int] = []
-        new_table += blank_row + blank_row
+        new_midgame_table: list[int] = blank_row + blank_row
+        new_endgame_table: list[int] = blank_row + blank_row
         for row in range(0, 64, 8):
-            new_table += [0] + ENDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
-        new_table += blank_row + blank_row
-        ENDGAME_PIECE_SQUARE_TABLES[piece] = new_table
+            new_midgame_table += [0] + MIDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
+            new_endgame_table += [0] + ENDGAME_PIECE_SQUARE_TABLES[piece][row:row + 8] + [0]
+        MIDGAME_PIECE_SQUARE_TABLES[piece] = new_midgame_table + blank_row + blank_row
+        ENDGAME_PIECE_SQUARE_TABLES[piece] = new_endgame_table + blank_row + blank_row
 
-    # default.bin is Komodo3's opening book by Salvo Spitaleri and is an extensive and accurate book for strong positional play
-    # alternative.bin is by Flavio Martin and is a great book for analysis and play
-    # basic.bin was released by Richard Pijl and is claimed to be nearly identical to the book used in the 2018 WCCC though it isn't too strong
-    # database.bin contains nearly 1 million entries and has the most extensive opening data yet every move is weighted equally meaning it is better as a database than for play
+    # default.bin is Komodo3's opening book by Salvo Spitaleri
+    # alternative.bin is by Italian player Flavio Martin
+    # basic.bin was released by Richard Pijl and is claimed to be nearly identical to the book used in the 2018 WCCC
+    # database.bin contains nearly 1 million entries and has the most extensive opening data yet all move weights are equal
 
     # Load opening book data
     OPENING_BOOKS: list[list[list[int]]] = [load_book("default"), load_book("alternative"), load_book("basic"), load_book("database")]
