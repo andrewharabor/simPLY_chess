@@ -23,7 +23,7 @@ A simple chess engine written in Python. This project was heavily inspired by [S
     - `uci`: Tell engine to use the uci (universal chess interface), this will be sent once as a first command after program boot to tell the engine to switch to uci mode.
     - `isready`: This is used to synchronize the engine with the GUI. When the GUI has sent a command or multiple commands that can take some time to complete, this command can be used to wait for the engine to be ready again or to ping the engine to find out if it is still alive.
     - `ucinewgame`: This is sent to the engine when the next search (started with `position` and `go`) will be from a different game. This can be a new game the engine should play or a new game it should analyze but also the next position from a testsuite with positions only.
-    - `position [fen <fenstring> | startpos ]  moves <move1> .... <movei>`: Set up the position described in fenstring on the internal board and play the moves on the internal chess board. If the game was played from the start position, the string `startpos` should be sent
+    - `position [fen <fenstring> | startpos]  moves <move1> .... <movei>`: Set up the position described in fenstring on the internal board and play the moves on the internal chess board. If the game was played from the start position, the string `startpos` should be sent
     - `go`: Start calculating on the current position set up with the `position` command. There are a number of commands that can follow this command, all will be sent in the same string. If just `go` is sent, `go depth 5 movetime 10000` is run by default.
       - `wtime <x>`: White has x milliseconds left on the clock.
       - `btime <x>`: Black has x milliseconds left on the clock.

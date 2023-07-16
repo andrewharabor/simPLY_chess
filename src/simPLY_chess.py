@@ -1131,6 +1131,8 @@ def main() -> None:
                 position, castling, opponent_castling, en_passant, king_passant, color = load_fen(fen)
             if "moves" in tokens:
                 moves_index: int = tokens.index("moves") + 1
+                if moves_index < 3:
+                    continue
                 moves: list[str] = tokens[moves_index:]
                 ply: int = 0
                 for ply, move in enumerate(moves):  # note that we don't actually check if the moves are legal
