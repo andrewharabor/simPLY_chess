@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 import itertools
 import random
@@ -911,11 +912,11 @@ def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent
     """Wraps the negamax search function in an iterative deepening loop, utilizing the transposition table and PV move
     ordering to improve search efficiency."""
     global max_depth, nodes, start_time, timeout
-    weighted_entry: tuple[int, int, str, str]
-    _, weighted_entry = book_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
-    if weighted_entry != (0, 0, "", ""):
-        send_response(f"info string weighted bookmove")
-        return weighted_entry
+    # weighted_entry: tuple[int, int, str, str]
+    # _, weighted_entry = book_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+    # if weighted_entry != (0, 0, "", ""):
+    #     send_response(f"info string weighted bookmove")
+    #     return weighted_entry
 
     # max_entry: tuple[int, int, str, str]
     # max_entry, _ = book_entries(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
@@ -1108,7 +1109,8 @@ def main() -> None:
                     MIDGAME_PIECE_SQUARE_TABLES[piece] = new_midgame_table + blank_row + blank_row
                     ENDGAME_PIECE_SQUARE_TABLES[piece] = new_endgame_table + blank_row + blank_row
                 # Load opening book data
-                OPENING_BOOKS = [load_book("main" + str(num)) for num in range(1, 8)]  # possible to load each book individually
+                # OPENING_BOOKS = [load_book("main" + str(num)) for num in range(1, 8)]  # possible to load each book individually
+                OPENING_BOOKS = []
                 # Global variable initialization
                 max_depth = 0
                 nodes = 0
