@@ -1213,7 +1213,7 @@ def main() -> None:
             for row in board:
                 send_response(row)
             send_response(f"FEN: {generate_fen(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
-            send_response(f"HASH: {zobrist_hash(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
+            send_response(f"HASH: {hex(zobrist_hash(position, castling[:], opponent_castling[:], en_passant, king_passant, color))}")
         elif tokens[0] == "flip":
             position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
             if color == "w":
