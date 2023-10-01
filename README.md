@@ -33,7 +33,8 @@ A simple chess engine written in Python. This project was heavily inspired by [S
       - `movetime <x>`: Search exactly x milliseconds.
     - `quit`: Quit the program as soon as possible.
   - Custom commands:
-    - `board`: Display the current position, with ASCII art and FEN.
+    - `board`: Display the current position in a textual representation.
+      - `unicode`: Optional argument to use unicode characters for the pieces instead of ASCII.
     - `eval`: Display the static evaluation of the current position.
     - `flip`: Flips the side to move.
 

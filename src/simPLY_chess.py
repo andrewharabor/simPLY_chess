@@ -488,6 +488,14 @@ DECODED_PROMOTION_PIECES: dict[int, str] = {
     4: "Q",
 }
 
+UNICODE_PIECE_SYMBOLS = {
+    "R": "♖", "r": "♜",
+    "N": "♘", "n": "♞",
+    "B": "♗", "b": "♝",
+    "Q": "♕", "q": "♛",
+    "K": "♔", "k": "♚",
+    "P": "♙", "p": "♟",
+}
 
 ###############
 # BOARD LOGIC #
@@ -1043,8 +1051,8 @@ def generate_fen(position: str, castling: list[bool], opponent_castling: list[bo
     return fen
 
 
-def display_board(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> list[str]:
-    """Converts the position into a list of strings in which each string represents a row in an ASCII display of the
+def display_board(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str, unicode: bool = False) -> list[str]:
+    """Converts the position into a list of strings in which each string represents a row in an text display of the
     board."""
     if color == "b":
         position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
@@ -1054,7 +1062,7 @@ def display_board(position: str, castling: list[bool], opponent_castling: list[b
         row: str = "|"
         for file in range(8):
             piece: str = position[(10 * (rank + 2)) + file + 1]
-            row += (f" {piece if piece != '.' else ' '} |")
+            row += (f" {(UNICODE_PIECE_SYMBOLS[piece] if unicode else piece) if piece != '.' else ' '} |")
         row += (f" {str(8 - rank)}")
         board.append("".join(row))
     board.append("+---+---+---+---+---+---+---+---+")
@@ -1209,11 +1217,14 @@ def main() -> None:
                 score *= -1
             send_response(f"static eval: {'+' if str(score)[0] != '-' else ''}{score}")
         elif tokens[0] == "board":
-            board: list[str] = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+            if len(tokens) >= 2 and tokens[1] == "unicode":
+                board = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color, unicode=True)
+            else:
+                board = display_board(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             for row in board:
                 send_response(row)
             send_response(f"FEN: {generate_fen(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
-            send_response(f"HASH: {hex(zobrist_hash(position, castling[:], opponent_castling[:], en_passant, king_passant, color))}")
+            send_response(f"HASH: {hex(zobrist_hash(position, castling[:], opponent_castling[:], en_passant, king_passant, color)).upper()}")
         elif tokens[0] == "flip":
             position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
             if color == "w":
