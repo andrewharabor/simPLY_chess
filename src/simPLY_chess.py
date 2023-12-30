@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 #########################################################################
-# simPLY_chess, a simple chess engine written in Python.                #
+# simPLY_chess, a simple chess engine written in Python                 #
 # Copyright (C) 2023  Andrew Harabor                                    #
 #                                                                       #
 # This program is free software: you can redistribute it and/or modify  #
