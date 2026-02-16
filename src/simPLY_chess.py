@@ -19,6 +19,7 @@
 #########################################################################
 
 import itertools
+import pathlib
 import random
 import struct
 import sys
@@ -732,7 +733,7 @@ def principal_variation(length: int, position: str, castling: list[bool], oppone
 
 def load_book(book_name: str) -> list[list[int]]:
     """Loads an opening book and returns it as a list of lists of raw integer data."""
-    with open(f"src/opening_books/{book_name}.bin", "rb") as file:
+    with open(f"{pathlib.Path.cwd()}/src/opening_books/{book_name}.bin", "rb") as file:
         file_content: bytes = file.read()
     integer_data: list[int] = list(struct.unpack(">" + ("QHHI" * (len(file_content) // 16)), file_content))
     return [integer_data[i:i + 4] for i in range(0, len(integer_data), 4)]
