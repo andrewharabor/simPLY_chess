@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --script
+#!/usr/bin/python3
 
 #########################################################################
 # simPLY_chess, a simple chess engine written in Python                 #
@@ -1189,7 +1189,7 @@ def main() -> None:
         elif tokens[0] == "go":
             if len(position) != 120 or len(castling) != 2 or len(opponent_castling) != 2 or not 0 <= en_passant <= 119 or not 0 <= king_passant <= 119 or color not in ("w", "b"):  # invalid position
                 continue
-            depth: int = 5
+            depth: int = 10
             time_limit = 10  # all times are in seconds
             if "movetime" in tokens:
                 movetime_index: int = tokens.index("movetime") + 1
@@ -1223,10 +1223,7 @@ def main() -> None:
                 if color == 'b':
                     white_time, black_time = black_time, white_time
                     white_increment, black_increment = black_increment, white_increment
-                if white_time <= 60:
-                    time_limit = 1
-                else:
-                    time_limit = white_time / 40 + white_increment
+                time_limit = white_time / 20 + white_increment / 2
             # Technically, we have to be able to recieve the `stop` command at any time but we'd need concurrency to do so
             best_move: tuple[int, int, str, str] = iteratively_deepen(depth, position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             send_response(f"bestmove {algebraic_notation(best_move, color)}")
