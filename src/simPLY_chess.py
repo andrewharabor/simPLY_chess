@@ -27,7 +27,7 @@ import time
 
 NAME: str = "simPLY_chess"
 AUTHOR: str = "andrewharabor"
-VERSION: str = "3.3"
+VERSION: str = "3.4"
 
 ##################################
 # CONSTANTS AND GLOBAL VARIABLES #
@@ -81,6 +81,9 @@ INITIAL_COLOR: str = "w"  # the current player's color
 
 # Transposition table, used to store previously calculated positions and keep track of the best move
 TRANSPOSITION_TABLE: dict[int, tuple[tuple[int, int, str, str], int, int]] = {}  # format is {zobrist_key: (best_move, depth, score)}
+
+# Repetition table, used to detect draw by reptition
+REPETITION_TABLE: dict[int, int] = {} # format is {zobrist_key: count}
 
 # Piece values, piece square tables, and tropism values for the middlegame and endgame
 # Used to evaluate the position in terms of material and piece placement, and king safety
@@ -555,7 +558,7 @@ def generate_moves(position: str, castling: list[bool], en_passant: int) -> list
     return move_list
 
 
-def make_move(move: tuple[int, int, str, str], position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[str, list[bool], list[bool], int, int]:
+def make_move(move: tuple[int, int, str, str], position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> tuple[str, list[bool], list[bool], int, int, str]:
     """Makes a move on the given position."""
     list_position: list[str] = list(position)
     start_square: int = move[0]
@@ -593,10 +596,10 @@ def make_move(move: tuple[int, int, str, str], position: str, castling: list[boo
         else:
             en_passant = 0
     position = "".join(list_position)
-    return position, castling, opponent_castling, en_passant, king_passant
+    return position, castling, opponent_castling, en_passant, king_passant, color
 
 
-def rotate_position(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> tuple[str, list[bool], list[bool], int, int]:
+def rotate_position(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> tuple[str, list[bool], list[bool], int, int, str]:
     """Rotates the board 180 degrees and swaps the case of the pieces so that it is from the opponent's point of view.
     Typically called after make_move() since our engine always looks from the current player's point of view."""
     en_passant = 119 - en_passant
@@ -607,7 +610,8 @@ def rotate_position(position: str, castling: list[bool], opponent_castling: list
         if not list_position[i].isspace():
             list_position[119 - i], list_position[i] = list_position[i].swapcase(), list_position[119 - i].swapcase()
     position = "".join(list_position)
-    return position, castling, opponent_castling, en_passant, king_passant
+    color = "b" if color == "w" else "w"
+    return position, castling, opponent_castling, en_passant, king_passant, color
 
 
 def king_in_check(position: str, castling: list[bool], king_passant: int) -> bool:
@@ -663,9 +667,14 @@ def interpolate(midgame_score: int, endgame_score: int, phase: int) -> int:
     return ((midgame_score * (256 - phase)) + (endgame_score * phase)) // 256
 
 
-def evaluate_position(position: str) -> int:
+def evaluate_position(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> int:
     """Evaluates the given position for the side-to-move using material values, piece square tables, king tropism,
     and mop-up bonus and interpolating between midgame and endgame scores."""
+
+    key: int = zobrist_hash(position, castling, opponent_castling, en_passant, king_passant, color)
+    if REPETITION_TABLE.get(key) is not None and REPETITION_TABLE[key] >= 2:
+        return 0
+
     midgame_score: int = 0
     endgame_score: int = 0
     king_square: int = position.find("K") if "K" in position else 0
@@ -722,9 +731,9 @@ def principal_variation(length: int, position: str, castling: list[bool], oppone
         return []
 
     best_move: tuple[int, int, str, str] = result[0]
-    new_position: tuple[str, list[bool], list[bool], int, int] = make_move(best_move, position, castling[:], opponent_castling[:], en_passant, king_passant)
+    new_position: tuple[str, list[bool], list[bool], int, int, str] = make_move(best_move, position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     new_position = rotate_position(*new_position)
-    return [best_move] + principal_variation(length - 1, *new_position, "w" if color == "b" else "b")
+    return [best_move] + principal_variation(length - 1, *new_position,)
 
 
 ######################################
@@ -743,7 +752,7 @@ def zobrist_hash(position: str, castling: list[bool], opponent_castling: list[bo
     """Calculates a Zobrist hash for the given position using the PolyGlot book format."""
     if color == "b":
         # Position must be from white's perspective for hashing
-        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+        position, castling, opponent_castling, en_passant, king_passant, color = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
         turn_hash: int = 0
     else:
         turn_hash: int = HASH_VALUES[780]
@@ -841,7 +850,7 @@ def book_entries(position: str, castling: list[bool], opponent_castling: list[bo
 # SEARCH LOGIC #
 ################
 
-def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int) -> int:
+def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> int:
     """Performs a fail-hard quiescent search (searches captures only until a quiet position is reached) with delta
     pruning."""
     global nodes, start_time, time_limit, timeout
@@ -850,7 +859,7 @@ def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent
         return 0
 
     nodes += 1
-    stand_pat: int = evaluate_position(position)
+    stand_pat: int = evaluate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     if stand_pat >= beta:
         return stand_pat
 
@@ -860,14 +869,20 @@ def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent
     for move in move_list:
         if not move[2].islower():  # not a capture
             continue
-        new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        new_position: tuple[str, list[bool], list[bool], int, int, str] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant, color)
         new_position = rotate_position(*new_position)
         if king_in_check(new_position[0], castling[:], new_position[4]): # if the move results in our king being in check (illegal move)
             continue
         delta: int = 200  # delta safety margin to account for potential positional compensation
         if stand_pat + ENDGAME_PIECE_VALUES[move[2].upper()] + (ENDGAME_PIECE_VALUES[move[3]] if move[3].isupper() else 0) + delta < alpha:  # delta pruning
             continue
+        key: int = zobrist_hash(*new_position)
+        if REPETITION_TABLE.get(key) is None:
+            REPETITION_TABLE[key] = 1
+        else:
+            REPETITION_TABLE[key] += 1
         score = -quiesce(-beta, -alpha, *new_position)
+        REPETITION_TABLE[key] -= 1
         if timeout:
             return 0
 
@@ -888,7 +903,7 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
         return 0, (0, 0, "", "")
 
     if depth == 0:
-        return quiesce(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant), (0, 0, "", "")
+        return quiesce(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant, color), (0, 0, "", "")
 
     key: int = zobrist_hash(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     table_info: tuple[tuple[int, int, str, str], int, int] | None = TRANSPOSITION_TABLE.get(key)
@@ -906,12 +921,18 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
             break
     best_move: tuple[int, int, str, str] = (0, 0, "", "")
     for move in move_list:
-        new_position: tuple[str, list[bool], list[bool], int, int] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant)
+        new_position: tuple[str, list[bool], list[bool], int, int, str] = make_move(move, position, castling[:], opponent_castling[:], en_passant, king_passant, color)
         new_position = rotate_position(*new_position)
         if king_in_check(new_position[0], castling[:], new_position[4]):  # if the move results in our king being in check (illegal move)
             continue
         legal_moves.append(move)
-        score: int = -nega_max(depth - 1, -beta, -alpha, *new_position, "w" if color == "b" else "b")[0]
+        key: int = zobrist_hash(*new_position)
+        if REPETITION_TABLE.get(key) is None:
+            REPETITION_TABLE[key] = 1
+        else:
+            REPETITION_TABLE[key] += 1
+        score: int = -nega_max(depth - 1, -beta, -alpha, *new_position)[0]
+        REPETITION_TABLE[key] -= 1
         if timeout:
             return 0, (0, 0, "", "")
 
@@ -922,7 +943,7 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
             alpha = score
             best_move = move
     if len(legal_moves) == 0:  # if there are no legal moves, it's either checkmate or stalemate.
-        new_position = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+        new_position = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
         if king_in_check(new_position[0], castling[:], 0):
             return -CHECKMATE_LOWER + max_depth - depth, (0, 0, "", "")
 
@@ -1032,14 +1053,14 @@ def load_fen(fen: str) -> tuple[str, list[bool], list[bool], int, int, str]:
     king_passant: int = 0
     color = fields[1]
     if color == "b":
-        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+        position, castling, opponent_castling, en_passant, king_passant, _ = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     return position, castling, opponent_castling, en_passant, king_passant, color
 
 
 def generate_fen(position: str, castling: list[bool], opponent_castling: list[bool], en_passant: int, king_passant: int, color: str) -> str:
     """Returns a FEN string representing the given position."""
     if color == "b":
-        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+        position, castling, opponent_castling, en_passant, king_passant, _ = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     fen: str = ""
     for rank in range(8):
         empty_squares: int = 0
@@ -1074,7 +1095,7 @@ def display_board(position: str, castling: list[bool], opponent_castling: list[b
     """Converts the position into a list of strings in which each string represents a row in an text display of the
     board."""
     if color == "b":
-        position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
+        position, castling, opponent_castling, en_passant, king_passant, _ = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
     board: list[str] = []
     for rank in range(8):
         board.append("+---+---+---+---+---+---+---+---+")
@@ -1154,9 +1175,11 @@ def main() -> None:
                 en_passant = INITIAL_EN_PASSANT
                 king_passant = INITIAL_KING_PASSANT
                 color = INITIAL_COLOR
+                REPETITION_TABLE.clear()
             elif len(tokens) >= 8 and tokens[1] == "fen":
                 fen: str = " ".join(tokens[2:8])
                 position, castling, opponent_castling, en_passant, king_passant, color = load_fen(fen)
+                REPETITION_TABLE.clear()
             if "moves" in tokens:
                 moves_index: int = tokens.index("moves") + 1
                 if moves_index < 3:
@@ -1171,20 +1194,13 @@ def main() -> None:
                         if color == "b":  # if black to move, flip the coordinates
                             start_square = 119 - start_square
                             end_square = 119 - end_square
-                        if ply % 2 == 1:  # opponent's move so we flip the coordinates, then rotate the board before and after making the move
-                            start_square = 119 - start_square
-                            end_square = 119 - end_square
-                            position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
-                            position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant)
-                            position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
-                        else:  # our move so we just make it
-                            position, castling, opponent_castling, en_passant, king_passant = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant)
-                if ply % 2 == 0:  # rotate the board after the last move was made and switch the color
-                    position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
-                    if color == "w":
-                        color = "b"
-                    elif color == "b":
-                        color = "w"
+                        position, castling, opponent_castling, en_passant, king_passant, color = make_move((start_square, end_square, ".", promotion_piece), position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+                        position, castling, opponent_castling, en_passant, king_passant, color = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+                        key: int = zobrist_hash(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
+                        if REPETITION_TABLE.get(key) is None:
+                            REPETITION_TABLE[key] = 1
+                        else:
+                            REPETITION_TABLE[key] += 1
             king_passant = 0
         elif tokens[0] == "go":
             if len(position) != 120 or len(castling) != 2 or len(opponent_castling) != 2 or not 0 <= en_passant <= 119 or not 0 <= king_passant <= 119 or color not in ("w", "b"):  # invalid position
@@ -1228,7 +1244,7 @@ def main() -> None:
             best_move: tuple[int, int, str, str] = iteratively_deepen(depth, position, castling[:], opponent_castling[:], en_passant, king_passant, color)
             send_response(f"bestmove {algebraic_notation(best_move, color)}")
         elif tokens[0] == "eval":
-            score: float = evaluate_position(position) / 100
+            score: float = evaluate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color) / 100
             if color == "b":
                 score *= -1
             send_response(f"static eval: {'+' if str(score)[0] != '-' else ''}{score}")
@@ -1242,11 +1258,7 @@ def main() -> None:
             send_response(f"FEN: {generate_fen(position, castling[:], opponent_castling[:], en_passant, king_passant, color)}")
             send_response(f"HASH: {hex(zobrist_hash(position, castling[:], opponent_castling[:], en_passant, king_passant, color)).upper()}")
         elif tokens[0] == "flip":
-            position, castling, opponent_castling, en_passant, king_passant = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant)
-            if color == "w":
-                color = "b"
-            elif color == "b":
-                color = "w"
+            position, castling, opponent_castling, en_passant, king_passant, color = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
 
 
 if __name__ == "__main__":
