@@ -27,7 +27,7 @@ import time
 
 NAME: str = "simPLY_chess"
 AUTHOR: str = "andrewharabor"
-VERSION: str = "3.4"
+VERSION: str = "3.5"
 
 ##################################
 # CONSTANTS AND GLOBAL VARIABLES #
@@ -742,7 +742,7 @@ def principal_variation(length: int, position: str, castling: list[bool], oppone
 
 def load_book(book_name: str) -> list[list[int]]:
     """Loads an opening book and returns it as a list of lists of raw integer data."""
-    with open(f"{pathlib.Path(__file__).resolve().parent}/opening_books/{book_name}.bin", "rb") as file:
+    with open(f"{pathlib.Path(__file__).resolve().parent}/simPLY_chess-books/{book_name}.bin", "rb") as file:
         file_content: bytes = file.read()
     integer_data: list[int] = list(struct.unpack(">" + ("QHHI" * (len(file_content) // 16)), file_content))
     return [integer_data[i:i + 4] for i in range(0, len(integer_data), 4)]
@@ -856,7 +856,7 @@ def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent
     global nodes, start_time, time_limit, timeout
     if time.time() - start_time > time_limit:
         timeout = True
-        return 0
+        return alpha
 
     nodes += 1
     stand_pat: int = evaluate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
@@ -883,14 +883,16 @@ def quiesce(alpha: int, beta: int, position: str, castling: list[bool], opponent
             REPETITION_TABLE[key] += 1
         score = -quiesce(-beta, -alpha, *new_position)
         REPETITION_TABLE[key] -= 1
-        if timeout:
-            return 0
 
         if score >= beta:
             return beta # fail-hard beta cutoff
 
         if score > alpha:
             alpha = score
+
+        if timeout:
+            return alpha
+
     return alpha
 
 
@@ -900,7 +902,7 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
     global max_depth, nodes, start_time, time_limit, timeout
     if time.time() - start_time > time_limit:
         timeout = True
-        return 0, (0, 0, "", "")
+        return alpha, (0, 0, "", "")
 
     if depth == 0:
         return quiesce(alpha, beta, position, castling[:], opponent_castling[:], en_passant, king_passant, color), (0, 0, "", "")
@@ -933,15 +935,17 @@ def nega_max(depth: int, alpha: int, beta: int, position: str, castling: list[bo
             REPETITION_TABLE[key] += 1
         score: int = -nega_max(depth - 1, -beta, -alpha, *new_position)[0]
         REPETITION_TABLE[key] -= 1
-        if timeout:
-            return 0, (0, 0, "", "")
 
         if score >= beta:
-            return beta, best_move  # fail-hard beta cutoff
+            return beta, move  # fail-hard beta cutoff
 
         if score > alpha:
             alpha = score
             best_move = move
+
+        if timeout:
+            return alpha, best_move
+
     if len(legal_moves) == 0:  # if there are no legal moves, it's either checkmate or stalemate.
         new_position = rotate_position(position, castling[:], opponent_castling[:], en_passant, king_passant, color)
         if king_in_check(new_position[0], castling[:], 0):
@@ -1158,6 +1162,7 @@ def main() -> None:
                     ENDGAME_PIECE_SQUARE_TABLES[piece] = new_endgame_table + blank_row + blank_row
                 # Load opening book data
                 OPENING_BOOKS = [load_book("main" + str(num)) for num in range(1, 8)]  # possible to load each book individually
+                # OPENING_BOOKS = []
                 # Global variable initialization
                 max_depth = 0
                 nodes = 0
