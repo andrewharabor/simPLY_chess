@@ -998,6 +998,12 @@ def iteratively_deepen(depth: int, position: str, castling: list[bool], opponent
         if best_move == (0, 0, "", ""):
             break
         previous_best_move = best_move
+
+    # hackish bug fix?
+    move_list: list[tuple[int, int, str, str]] = generate_moves(position, castling[:], en_passant)
+    if len(move_list) != 0 and best_move not in move_list:
+        return move_list[0]
+
     return best_move
 
 
